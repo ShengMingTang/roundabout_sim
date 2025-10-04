@@ -2,6 +2,8 @@ use json::{JsonValue, object};
 use num_complex::Complex;
 use std::f32::consts::PI;
 use std::fs;
+use std::rc::Rc;
+use std::cell::RefCell;
 // to polar will use [-pi, +pi]
 
 
@@ -232,23 +234,26 @@ impl RoundaboutSim {
         max_t: maximum tick simulated
 
     */
-    pub fn start(&mut self, max_t: f32) -> Result<String, String> {
+    pub fn start(self, max_t: f32) -> Result<String, String> {
         let mut t = 0.0;
         let setting = &self.setting;
+        let cars: Vec<Rc<RefCell<Car>>> = self.cars.into_iter().map(|car| {Rc::new(RefCell::new(car))}).collect();
         loop {
             let mut actions = vec![];
-            for car in &mut self.cars {
-                actions.push(car.action(setting.tick, setting));
+            for car in &cars {
+                actions.push(car.borrow().action(setting.tick, setting));
             }
             let mut all_finished = true;
-            for (car, action) in self.cars.iter_mut().zip(actions.into_iter()) {
-                car.update(setting.tick, setting, action);
-                all_finished &= car.finished();
+            for (car, action) in cars.iter().zip(actions.into_iter()) {
+                {
+                    car.borrow_mut().update(setting.tick, setting, action);
+                }
+                all_finished &= car.borrow().finished();
             }
             t += self.setting.tick;
             println!("===== t: {t} =====");
-            for car in &self.cars {
-                println!("id: {}: {}", car.id, json::stringify(car.to_json()));
+            for car in &cars {
+                println!("id: {}: {}", car.borrow().id, json::stringify(car.borrow().to_json()));
             }
             if all_finished {
                 return Ok(String::from("finished"));
