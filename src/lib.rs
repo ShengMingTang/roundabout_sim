@@ -125,11 +125,19 @@ impl Car {
 }
 
 #[derive(Debug)]
+pub enum SwitchPolicy { // Handles the collision arising from switch to another lane
+    SwitchFirst,
+    StraightFirst,
+    Random(f32), // switch will succed with probability f32
+}
+
+#[derive(Debug)]
 pub struct RoundaboutSimSetting {
     n_inter: usize, // intersection
     n_cars: usize, // no. cars
     r_lanes: Vec<f32>, // radius of each lane
     tick: f32, // simulation update interval
+    switch_policy: SwitchPolicy,
 }
 impl RoundaboutSimSetting {
     pub fn default() -> RoundaboutSimSetting {
@@ -138,6 +146,7 @@ impl RoundaboutSimSetting {
             n_cars: 1,
             r_lanes: vec![1.0],
             tick: 0.1,
+            switch_policy: SwitchPolicy::StraightFirst,
         }
     }
     pub fn to_json(&self) -> JsonValue {
@@ -187,6 +196,15 @@ impl RoundaboutSimSetting {
             n_cars: jobj["n_cars"].as_usize()?,
             r_lanes,
             tick: jobj["tick"].as_f32()?,
+            switch_policy: if jobj.has_key("switch_policy") {
+                match jobj["switch_policy"].as_str()? {
+                    "SwitchFirst" => SwitchPolicy::SwitchFirst,
+                    "StraightFirst" => SwitchPolicy::StraightFirst,
+                    _ => SwitchPolicy::Random(jobj["switch_policy"].as_str()?.parse::<f32>().ok()?),
+                }
+            } else {
+                RoundaboutSimSetting::default().switch_policy
+            },
         };
         if ret.r_lanes.len() == 0 {
             None
@@ -238,11 +256,17 @@ impl RoundaboutSim {
     pub fn start(&mut self, max_t: f32) -> Result<f32, String> {
         let setting = &self.setting;
         let mut by_lane = HashMap::< usize, LinkedList<Shared<Car>> >::new();
-        // TODO: This part varies with Roundabout rules
+        // assume no cars joining once self.cars is sorted
+        self.cars.sort_by(
+            |c0, c1| {
+                unwrap_theta(c0.borrow().pos.arg()).partial_cmp(&unwrap_theta(c1.borrow().pos.arg())).unwrap()
+            }
+        );
         for car in &self.cars {
             let list = by_lane.entry(car.borrow().lane).or_insert(LinkedList::<Shared<Car>>::new());
             list.push_back(car.clone());
         }
+        // Need to check list is sorted?
         loop {
             let mut tick = setting.tick;
             for car in &self.cars {
@@ -251,16 +275,16 @@ impl RoundaboutSim {
                 };
                 car.borrow_mut().set_action(action);
             }
-            // TODO: detect straight-straight collision, happens to the same lane
+            // detect straight collision, happens to the same lane
             for (_lane, car_list) in &by_lane {
                 for (car_follow, car_precede) in car_list.iter().zip(car_list.iter().skip(1)) {
-                    let time_to_collide = self.straight_straight_collision(
+                    let time_to_collide = self.straight_collision(
                         &car_follow.borrow(),
                         &car_precede.borrow(),
                     );
                     if time_to_collide <= 0.0 {
                         car_follow.borrow_mut().set_action(Action::Stop);
-                        println!("Reject Car {}", &car_follow.borrow().id);
+                        println!("Reject Car {} by Car {}", car_follow.borrow().id, car_precede.borrow().id);
                     }
                     else {
                         tick = f32::min(tick, time_to_collide);
@@ -268,35 +292,56 @@ impl RoundaboutSim {
                 }
                 // last one is missed
                 if car_list.len() > 1 {
-                    let time_to_collide = self.straight_straight_collision(
+                    let time_to_collide = self.straight_collision(
                         &car_list.back().unwrap().borrow(),
                         &car_list.front().unwrap().borrow(),
                     );
                     if time_to_collide <= 0.0 {
                         car_list.back().unwrap().borrow_mut().set_action(Action::Stop);
-                        println!("Reject Car {} back-front", &car_list.back().unwrap().borrow().id);
+                        println!("Reject Car {} by Car {}", car_list.back().unwrap().borrow().id, car_list.front().unwrap().borrow().id);
                     }
                     else {
                         tick = f32::min(tick, time_to_collide);
                     }
                 }
             }
-            // TODO: detect switch-straight collision
-            // TODO: update tick should be determined by self
+            // TODO: detect switch collision
+            // detect switch out
+            for (lane, car_list) in &by_lane {
+                for car in car_list {
+                    
+                }
+            }
+            // detect switch in
             self.t += tick;
             let mut all_finished = true;
             let mut has_progress = false;
+            // TODO: Another chance for changing their actions?
+            // update phase
             for car in self.cars.iter() {
+                let lane_before = {
+                    car.borrow().lane
+                };
                 {
                     car.borrow_mut().update(tick, setting);
                 }
                 match car.borrow().action {
                     Action::Stop => {},
+                    Action::Switch(ref diff_lane) => {
+                        // TODO: Insert into another lane
+                        let lane_after = car.borrow().lane;
+                        if lane_before != lane_after {
+                            // remove from before
+                            // insert into after
+                            // may collect and merge two lists all at once
+                        }
+                        has_progress = true;
+                    }
                     _ => {has_progress = true;}
                 };
                 all_finished &= car.borrow().finished();
             }
-            assert!(has_progress || all_finished, "every stops but not finished");
+            assert!(has_progress || all_finished, "every one stops but not finished");
             println!("===== t: {} (+{}) =====", self.t, tick);
             for car in &self.cars {
                 println!("id: {}: {}", car.borrow().id, json::stringify(car.borrow().to_json()));
@@ -311,21 +356,26 @@ impl RoundaboutSim {
         Err(String::from("error"))
     }
     /**
-        Collision if c0 is switch in/out to the c1.lane and
-        c1.polar.theta is in the arc occupied by c1
-        or 
-        vice versa of c0 and c1
-        * TODO:
+        Collision if @car_switch is switch in/out to the @car_other.lane and
+        @car_other.polar.theta is in the arc occupied by @car_other with time @tick
     */
-    fn switch_straight_collision(&self, c0: &Car, c1: &Car, _tick: f32) -> bool {
-        if let Action::Straight = c1.action {
-            match c0.action {
+    fn switch_collision(&self, car_switch: &Car, car_other: &Car, tick: f32) -> bool {
+        if let Action::Straight = car_other.action {
+            let setting = &self.setting;
+            match car_switch.action {
                 Action::Switch(diff_lane) => {
-                    let next_lane = (c0.lane as i32 + diff_lane) as usize;
-                    let _t_switch = (self.setting.r_lanes[c0.lane] - self.setting.r_lanes[next_lane]).abs();
-                    let _diff_theta = c1.vel / self.setting.r_lanes[c1.lane];
-                    (next_lane == c1.lane) && 
-                    (false) // TODO: c0 is in the arc of c2
+                    let lane = (car_switch.lane as i32 + diff_lane) as usize;
+                    if lane != car_other.lane {
+                        return false;
+                    }
+                    let r_lane = setting.r_lanes[lane];
+                    let switch_target_pos = Complex::from_polar(r_lane, car_switch.pos.arg());
+                    let other_curr_pos = Complex::from_polar(r_lane, car_other.pos.arg());
+                    let other_target_pos = Complex::from_polar(r_lane, car_other.pos.arg() + car_other.vel * tick / (r_lane as f32));
+                    // @car_switch is in the arc of @car_other
+                    let other_curr_2_swtich_target = switch_target_pos / other_curr_pos;
+                    let switch_target_2_other_target = other_target_pos / switch_target_pos;
+                    other_curr_2_swtich_target.arg() >= 0.0 && switch_target_2_other_target.arg() <= 0.0
                 },
                 _ => false,                    
             }
@@ -339,20 +389,25 @@ impl RoundaboutSim {
         assuming @car_precede stays still, and @car_follow take straight action
         Check return value <= 0 as a signal to update @car_follow or not
     */
-    fn straight_straight_collision(&self, car_follow: &Car, car_precede: &Car) -> f32 {
-        assert_eq!(car_follow.lane, car_precede.lane,
-            "on the same lane but straight-straight collision called",
-        );
-        assert_ne!(car_follow.id, car_precede.id,
-            "have the same id"
-        );
-        if (car_precede.pos - car_follow.pos).norm() < SAFE_DISTANCE &&
-            (car_precede.pos / car_follow.pos).arg() > 0.0 {
-            return 0.0;
+    fn straight_collision(&self, car_follow: &Car, car_precede: &Car) -> f32 {
+        match car_follow.action {
+            Action::Straight => {
+                assert_eq!(car_follow.lane, car_precede.lane,
+                    "on the same lane but straight-straight collision called",
+                );
+                assert_ne!(car_follow.id, car_precede.id,
+                    "have the same id"
+                );
+                if (car_precede.pos - car_follow.pos).norm() < SAFE_DISTANCE &&
+                    (car_precede.pos / car_follow.pos).arg() > 0.0 {
+                    return 0.0;
+                }
+                let margin_theta = unwrap_theta((car_precede.pos / car_follow.pos).arg());
+                let lane = car_follow.lane;
+                margin_theta / (car_follow.vel / self.setting.r_lanes[lane])
+            },
+            _ => {return f32::MAX;},
         }
-        let margin_theta = unwrap_theta((car_precede.pos / car_follow.pos).arg());
-        let lane = car_follow.lane;
-        margin_theta / (car_follow.vel / self.setting.r_lanes[lane])
     }
 }
 
