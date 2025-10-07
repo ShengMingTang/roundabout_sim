@@ -1,0 +1,32 @@
+{
+    "n_inter": 2,
+    "n_cars": 2,
+    "tick": 0.1,
+    "r_lanes": [
+        1
+    ],
+    "init": {
+        "0": {
+            "id": 0,
+            "pos": "0+0i",
+            "vel": 0.5,
+            "lane": 0,
+            "dst": 1,
+            "action": "Straight",
+            "r": 0,
+            "theta": 0.2,
+            "src": 0
+        },
+        "1": {
+            "id": 1,
+            "pos": "0+0i",
+            "vel": 1,
+            "lane": 0,
+            "dst": 1,
+            "action": "Straight",
+            "r": 0,
+            "theta": 0.0,
+            "src": 0
+        }
+    }
+}
