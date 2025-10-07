@@ -243,6 +243,12 @@ impl RoundaboutSim {
                 action: Action::Switch(0),
             })))
         }
+        // assume no cars joining once self.cars is sorted
+        cars.sort_by(
+            |c0, c1| {
+                unwrap_theta(c0.borrow().pos.arg()).partial_cmp(&unwrap_theta(c1.borrow().pos.arg())).unwrap()
+            }
+        );
         Some(RoundaboutSim {
             t: 0.0,
             setting,
@@ -250,110 +256,95 @@ impl RoundaboutSim {
         })
     }
     /**
-        max_t: maximum tick simulated
-
+        return Some(seconds simulated) if simulation finished
+        else None to indicate continue
     */
-    pub fn start(&mut self, max_t: f32) -> Result<f32, String> {
+    pub fn update(&mut self) -> bool {
         let setting = &self.setting;
         let mut by_lane = HashMap::< usize, LinkedList<Shared<Car>> >::new();
-        // assume no cars joining once self.cars is sorted
-        self.cars.sort_by(
-            |c0, c1| {
-                unwrap_theta(c0.borrow().pos.arg()).partial_cmp(&unwrap_theta(c1.borrow().pos.arg())).unwrap()
-            }
-        );
         for car in &self.cars {
             let list = by_lane.entry(car.borrow().lane).or_insert(LinkedList::<Shared<Car>>::new());
             list.push_back(car.clone());
         }
-        // Need to check list is sorted?
-        loop {
-            let mut tick = setting.tick;
-            for car in &self.cars {
-                let action = {
-                    car.borrow().action(setting)
-                };
-                car.borrow_mut().set_action(action);
-            }
-            // detect straight collision, happens to the same lane
-            for (_lane, car_list) in &by_lane {
-                for (car_follow, car_precede) in car_list.iter().zip(car_list.iter().skip(1)) {
-                    let time_to_collide = self.straight_collision(
-                        &car_follow.borrow(),
-                        &car_precede.borrow(),
-                    );
-                    if time_to_collide <= 0.0 {
-                        car_follow.borrow_mut().set_action(Action::Stop);
-                        println!("Reject Car {} by Car {}", car_follow.borrow().id, car_precede.borrow().id);
-                    }
-                    else {
-                        tick = f32::min(tick, time_to_collide);
-                    }
+        let mut tick = setting.tick;
+        for car in &self.cars {
+            let action = {
+                car.borrow().action(setting)
+            };
+            car.borrow_mut().set_action(action);
+        }
+        // detect straight collision, happens to the same lane
+        for (_lane, car_list) in &by_lane {
+            for (car_follow, car_precede) in car_list.iter().zip(car_list.iter().skip(1)) {
+                let time_to_collide = self.straight_collision(
+                    &car_follow.borrow(),
+                    &car_precede.borrow(),
+                );
+                if time_to_collide <= 0.0 {
+                    car_follow.borrow_mut().set_action(Action::Stop);
+                    println!("Reject Car {} by Car {}", car_follow.borrow().id, car_precede.borrow().id);
                 }
-                // last one is missed
-                if car_list.len() > 1 {
-                    let time_to_collide = self.straight_collision(
-                        &car_list.back().unwrap().borrow(),
-                        &car_list.front().unwrap().borrow(),
-                    );
-                    if time_to_collide <= 0.0 {
-                        car_list.back().unwrap().borrow_mut().set_action(Action::Stop);
-                        println!("Reject Car {} by Car {}", car_list.back().unwrap().borrow().id, car_list.front().unwrap().borrow().id);
-                    }
-                    else {
-                        tick = f32::min(tick, time_to_collide);
-                    }
+                else {
+                    tick = f32::min(tick, time_to_collide);
                 }
             }
-            // TODO: detect switch collision
-            // detect switch out
-            for (lane, car_list) in &by_lane {
-                for car in car_list {
-                    
+            // last one is missed
+            if car_list.len() > 1 {
+                let time_to_collide = self.straight_collision(
+                    &car_list.back().unwrap().borrow(),
+                    &car_list.front().unwrap().borrow(),
+                );
+                if time_to_collide <= 0.0 {
+                    car_list.back().unwrap().borrow_mut().set_action(Action::Stop);
+                    println!("Reject Car {} by Car {}", car_list.back().unwrap().borrow().id, car_list.front().unwrap().borrow().id);
                 }
-            }
-            // detect switch in
-            self.t += tick;
-            let mut all_finished = true;
-            let mut has_progress = false;
-            // TODO: Another chance for changing their actions?
-            // update phase
-            for car in self.cars.iter() {
-                let lane_before = {
-                    car.borrow().lane
-                };
-                {
-                    car.borrow_mut().update(tick, setting);
+                else {
+                    tick = f32::min(tick, time_to_collide);
                 }
-                match car.borrow().action {
-                    Action::Stop => {},
-                    Action::Switch(ref diff_lane) => {
-                        // TODO: Insert into another lane
-                        let lane_after = car.borrow().lane;
-                        if lane_before != lane_after {
-                            // remove from before
-                            // insert into after
-                            // may collect and merge two lists all at once
-                        }
-                        has_progress = true;
-                    }
-                    _ => {has_progress = true;}
-                };
-                all_finished &= car.borrow().finished();
-            }
-            assert!(has_progress || all_finished, "every one stops but not finished");
-            println!("===== t: {} (+{}) =====", self.t, tick);
-            for car in &self.cars {
-                println!("id: {}: {}", car.borrow().id, json::stringify(car.borrow().to_json()));
-            }
-            if all_finished {
-                return Ok(self.t);
-            }
-            if self.t >= max_t {
-                return Err(String::from("timeout"));
             }
         }
-        Err(String::from("error"))
+        // TODO: detect switch collision
+        // detect switch out
+        for (lane, car_list) in &by_lane {
+            for car in car_list {
+                
+            }
+        }
+        // detect switch in
+        self.t += tick;
+        let mut all_finished = true;
+        let mut has_progress = false;
+        // TODO: Another chance for changing their actions?
+        // update phase
+        for car in self.cars.iter() {
+            let lane_before = {
+                car.borrow().lane
+            };
+            {
+                car.borrow_mut().update(tick, setting);
+            }
+            match car.borrow().action {
+                Action::Stop => {},
+                Action::Switch(ref diff_lane) => {
+                    // TODO: Insert into another lane
+                    let lane_after = car.borrow().lane;
+                    if lane_before != lane_after {
+                        // remove from before
+                        // insert into after
+                        // may collect and merge two lists all at once
+                    }
+                    has_progress = true;
+                }
+                _ => {has_progress = true;}
+            };
+            all_finished &= car.borrow().finished();
+        }
+        assert!(has_progress || all_finished, "every one stops but not finished");
+        println!("===== t: {} (+{}) =====", self.t, tick);
+        for car in &self.cars {
+            println!("id: {}: {}", car.borrow().id, json::stringify(car.borrow().to_json()));
+        }
+        all_finished
     }
     /**
         Collision if @car_switch is switch in/out to the @car_other.lane and
@@ -413,11 +404,19 @@ impl RoundaboutSim {
 
 
 
-pub fn sim_run(filename: &str) -> Result<f32, String> {
+pub fn sim_run(filename: &str, max_t: f32) -> Option<f32> {
     let contents = fs::read_to_string(filename).expect("File not found");
     let jobj = json::parse(&contents).expect("file format error");
     let settings = RoundaboutSimSetting::new(&jobj).expect("some required key not specified");
     let mut sim = RoundaboutSim::new(settings, &jobj).expect("init cars format error");
     println!("sim init: {sim:?}");
-    sim.start(10.0)
+    let mut finished = false;
+    while sim.t < max_t && finished == false {
+        finished |= sim.update();
+    }
+    return if finished {
+        Some(sim.t)
+    } else {
+        None
+    }
 }

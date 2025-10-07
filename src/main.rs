@@ -16,6 +16,6 @@ fn main() {
         gen_circular(args[2].parse().expect("expect usize"));
     }
     else {
-        sim_run(&args[1]).unwrap();
+        sim_run(&args[1], 1e2).unwrap();
     }
 }
