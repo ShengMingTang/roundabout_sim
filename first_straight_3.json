@@ -1,0 +1,30 @@
+{
+    "n_inter": 4,
+    "n_cars": 2,
+    "r_lanes": [1.0, 0.5],
+    "tick": 0.1,
+    "switch_policy": "StraightFirst",
+    "init": {
+        "0": {
+            "src": 0,
+            "dst": 2,
+            "vel": 1.0,
+            "lane": 1,
+            "theta": 3.1415926
+        },
+        "1": {
+            "src": 0,
+            "dst": 2,
+            "vel": 1.0,
+            "lane": 0,
+            "theta": 3.10
+        },
+        "2": {
+            "src": 0,
+            "dst": 2,
+            "vel": 1.0,
+            "lane": 0,
+            "theta": 3.09
+        }
+    }
+}
