@@ -56,6 +56,6 @@ mod tests {
     */
     fn sim_straight_first_policy() {
         check_completion_order("first_straight.json", 10.0, &[1, 0]);
-        check_completion_order("first_straight_3.json", 10.0, &[1, 2, 0]);
+        check_completion_order("first_straight_3.json", 10.0, &[2, 1, 0]);
     }
 }

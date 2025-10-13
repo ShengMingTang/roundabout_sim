@@ -1,4 +1,5 @@
 {
+    "comment": "circular pattern, 4 cars",
     "n_inter": 4,
     "n_cars": 4,
     "tick": 0.10000000149011612,

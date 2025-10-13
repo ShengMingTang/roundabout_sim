@@ -1,7 +1,8 @@
 {
+    "comment": "Order: 0,1,2: all cars near the end, car 1 < pi/2 (straight, near, blocked by car 0), car 2 > pi/2 (straight but slow) should finish after car 0 (switching out)",
     "n_inter": 4,
     "n_cars": 2,
-    "r_lanes": [1.0, 0.5],
+    "r_lanes": [1.0, 0.7],
     "tick": 0.1,
     "switch_policy": "SwitchFirst",
     "init": {
@@ -22,7 +23,7 @@
         "2": {
             "src": 0,
             "dst": 3,
-            "vel": 1.0,
+            "vel": 0.5,
             "lane": 0,
             "theta": 3.2
         }

@@ -1,4 +1,5 @@
 {
+    "comment": "car 1 (fast) should always be blocked by car 0 (slow)",
     "n_inter": 2,
     "n_cars": 2,
     "tick": 0.1,
@@ -7,6 +8,7 @@
     ],
     "init": {
         "0": {
+            "comment": "slow",
             "id": 0,
             "pos": "0+0i",
             "vel": 0.5,
@@ -18,6 +20,7 @@
             "src": 0
         },
         "1": {
+            "comment": "fast but behind car 0",
             "id": 1,
             "pos": "0+0i",
             "vel": 1,

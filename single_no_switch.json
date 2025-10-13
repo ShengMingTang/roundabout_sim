@@ -1,4 +1,5 @@
 {
+    "comment": "a single car that should go straight and no switch",
     "n_inter": 2,
     "n_cars": 1,
     "r_lanes": [1.0, 0.5],
