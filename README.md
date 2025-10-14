@@ -13,7 +13,6 @@ Simulation of cars running on a multi-lane roundabout.
     "tick": 0.1, // simulation granularity
     "init": {
         "0": { // id
-            "src": 0, // start entrance
             "dst": 1, // destination
             "vel": 1.0, // velocity
             "lane": 0, // initial lane, index to r_lanes

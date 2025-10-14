@@ -7,21 +7,18 @@
     "switch_policy": "StraightFirst",
     "init": {
         "0": {
-            "src": 0,
             "dst": 15,
             "vel": 1.0,
             "lane": 1,
             "theta": 3.14159
         },
         "1": {
-            "src": 0,
             "dst": 16,
             "vel": 1.0,
             "lane": 0,
             "theta": 3.23
         },
         "2": {
-            "src": 0,
             "dst": 15,
             "vel": 1.0,
             "lane": 0,

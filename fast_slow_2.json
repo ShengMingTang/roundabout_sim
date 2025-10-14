@@ -16,8 +16,7 @@
             "dst": 1,
             "action": "Straight",
             "r": 0,
-            "theta": 0.2,
-            "src": 0
+            "theta": 0.2
         },
         "1": {
             "comment": "fast but behind car 0",
@@ -28,8 +27,7 @@
             "dst": 1,
             "action": "Straight",
             "r": 0,
-            "theta": 0.0,
-            "src": 0
+            "theta": 0.0
         }
     }
 }

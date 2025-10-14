@@ -41,13 +41,9 @@ fn unwrap_theta(theta: f32) -> f32 {
 impl Car {
     fn to_json(&self) -> JsonValue {
         object!{
-            id: self.id,
-            pos: self.pos.to_string(),
             vel: self.vel,
             lane: self.lane,
             dst: self.dst.to_string(),
-            action: format!("{:?}", self.action),
-            r: self.pos.to_polar().0,
             theta: self.pos.to_polar().1,
         }
     }
@@ -170,7 +166,6 @@ impl RoundaboutSimSetting {
                 dst: Complex::default(),
                 action: Action::Straight,
             }.to_json();
-            cjson["src"] = id.into();
             cjson["dst"] = ((id + 1) % n_cars).into();
             cjson["theta"] = (2.0 * PI / (n_cars as f32) * (id as f32)).into();
             cars_json[id.to_string()] = cjson;
@@ -380,7 +375,7 @@ impl RoundaboutSim {
         assert!(has_progress || all_finished, "everyone stops but not finished");
         println!("===== t: {} (+{}) =====", self.t, tick);
         for car in &self.cars {
-            println!("id: {}: {}", car.borrow().id, json::stringify(car.borrow().to_json()));
+            println!("id: {}: {:?}", car.borrow().id, car.borrow());
         }
         all_finished
     }

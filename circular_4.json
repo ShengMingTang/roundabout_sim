@@ -1,5 +1,4 @@
 {
-    "comment": "circular pattern, 4 cars",
     "n_inter": 4,
     "n_cars": 4,
     "tick": 0.10000000149011612,
@@ -8,48 +7,28 @@
     ],
     "init": {
         "0": {
-            "id": 0,
-            "pos": "0+0i",
             "vel": 1,
             "lane": 0,
             "dst": 1,
-            "action": "Straight",
-            "r": 0,
-            "theta": 0,
-            "src": 0
+            "theta": 0
         },
         "1": {
-            "id": 1,
-            "pos": "0+0i",
             "vel": 1,
             "lane": 0,
             "dst": 2,
-            "action": "Straight",
-            "r": 0,
-            "theta": 1.5707963705062867,
-            "src": 1
+            "theta": 1.5707963705062867
         },
         "2": {
-            "id": 2,
-            "pos": "0+0i",
             "vel": 1,
             "lane": 0,
             "dst": 3,
-            "action": "Straight",
-            "r": 0,
-            "theta": 3.1415927410125734,
-            "src": 2
+            "theta": 3.1415927410125734
         },
         "3": {
-            "id": 3,
-            "pos": "0+0i",
             "vel": 1,
             "lane": 0,
             "dst": 0,
-            "action": "Straight",
-            "r": 0,
-            "theta": 4.71238899230957,
-            "src": 3
+            "theta": 4.71238899230957
         }
     }
 }
