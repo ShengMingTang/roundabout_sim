@@ -1,3 +1,6 @@
+mod render;
+pub use crate::render::render_run;
+
 use json::{JsonValue, object};
 use num_complex::Complex;
 use std::f32::consts::PI;
@@ -246,6 +249,13 @@ impl RoundaboutSim {
             finished_cars: vec![],
         })
     }
+    fn from_json(filename: &str) -> Option<RoundaboutSim> {
+        let contents = fs::read_to_string(filename).expect("File not found");
+        let jobj = json::parse(&contents).expect("file format error");
+        let settings = RoundaboutSimSetting::new(&jobj).expect("some required key not specified");
+        let sim = RoundaboutSim::new(settings, &jobj).expect("init cars format error");
+        Some(sim)
+    }
     /**
         return Some(seconds simulated) if simulation finished
         else None to indicate continue
@@ -438,10 +448,7 @@ impl RoundaboutSim {
 
 
 pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
-    let contents = fs::read_to_string(filename).expect("File not found");
-    let jobj = json::parse(&contents).expect("file format error");
-    let settings = RoundaboutSimSetting::new(&jobj).expect("some required key not specified");
-    let mut sim = RoundaboutSim::new(settings, &jobj).expect("init cars format error");
+    let mut sim = RoundaboutSim::from_json(filename)?;
     println!("sim init: {sim:?}");
     let mut finished = false;
     while sim.t < max_t && finished == false {

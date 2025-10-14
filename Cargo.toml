@@ -6,5 +6,6 @@ edition = "2024"
 [dependencies]
 approx = "0.5.1"
 json = "0.12.4"
+macroquad = "0.4.14"
 num-complex = "0.4.6"
 ordered-float = "5.1.0"
