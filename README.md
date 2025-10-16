@@ -31,5 +31,5 @@ Simulation of cars running on a multi-lane roundabout.
 # Demo
 ``` $ cargo run -- <path_to_json> ``` for running one configuration
 # Todo
-1. Generate large random testcase
+1. Generate large random testcase -> Update too small
 2. Draw roundabout, cars (with action)

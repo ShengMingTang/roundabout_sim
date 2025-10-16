@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::{HashMap};
 use ordered_float::OrderedFloat;
+use rand;
 
 type Shared<T> = Rc<RefCell<T>>;
 
@@ -154,6 +155,38 @@ impl RoundaboutSimSetting {
             r_lanes: self.r_lanes.clone(),
         }
     }
+    pub fn gen_random(n_cars: usize, n_inter: usize, r_lanes: &[f32]) -> JsonValue {
+        assert!(n_cars > 0);
+        assert!(n_inter > 0);
+        assert!(r_lanes.len() > 0);
+        {
+            let mut r_lanes_reverse = r_lanes.to_vec();
+            r_lanes_reverse.reverse();
+            assert!(r_lanes_reverse.is_sorted());
+        }
+        let mut cars_json = JsonValue::new_object();
+        for id in 0..n_cars {
+            let mut cjson = Car {
+                id,
+                pos: Complex::default(),
+                vel: rand::random(),
+                lane: rand::random_range(0..r_lanes.len()),
+                dst: Complex::default(),
+                action: Action::Straight,
+            }.to_json();
+            cjson["dst"] = rand::random_range(0..n_inter).into();
+            cjson["theta"] = (rand::random::<f32>() * 2.0 * PI).into();
+            cars_json[id.to_string()] = cjson;
+        }
+        let setting = RoundaboutSimSetting {
+            n_inter,
+            r_lanes: r_lanes.to_vec(),
+            ..RoundaboutSimSetting::default()
+        };
+        let mut jobj = setting.to_json();
+        jobj["init"] = cars_json;
+        jobj
+    }
     pub fn gen_circular(n_cars: usize) -> JsonValue {
         assert!(n_cars > 0);
         let mut cars_json = JsonValue::new_object();
@@ -183,9 +216,11 @@ impl RoundaboutSimSetting {
         for it in jobj["r_lanes"].members() {
             r_lanes.push(it.as_f32()?);
         }
-        let mut r_lanes_reverse = r_lanes.clone();
-        r_lanes_reverse.reverse();
-        assert!(r_lanes.len() > 0 && r_lanes_reverse.is_sorted(), "lanes should be of len > 0 and sorted in decreasing order");
+        {
+            let mut r_lanes_reverse = r_lanes.clone();
+            r_lanes_reverse.reverse();
+            assert!(r_lanes.len() > 0 && r_lanes_reverse.is_sorted(), "lanes should be of len > 0 and sorted in decreasing order");
+        }
         let ret = RoundaboutSimSetting {
             n_inter: jobj["n_inter"].as_usize()?,
             r_lanes,

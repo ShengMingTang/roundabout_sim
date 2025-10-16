@@ -58,4 +58,14 @@ mod tests {
         check_completion_order("first_straight.json", 10.0, &[1, 0]);
         check_completion_order("first_straight_3.json", 10.0, &[2, 1, 0]);
     }
+
+    #[test]
+    #[ignore]
+    /**
+        Verify straight-first by check their completion order
+    */
+    fn long_test() {
+        sim_run("rand_30_4_5..1.json", 3000.0).unwrap();
+        sim_run("rand_300_8_5..1.json", 3000.0).unwrap();
+    }
 }
