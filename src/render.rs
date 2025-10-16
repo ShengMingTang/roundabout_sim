@@ -5,7 +5,7 @@ pub async fn render_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
     println!("sim init: {sim:?}");
     let mut finished = false;
-    while sim.t < max_t && finished == false {
+    while (sim.t < max_t || max_t < 0.0) && finished == false {
         finished |= sim.update();
         render_update(&mut sim);
         next_frame().await

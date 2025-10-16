@@ -35,9 +35,9 @@ async fn main() {
         println!("{}", json::stringify(jobj));
     }
     else if args[1] == "headless" {
-        sim_run(&args[2], 1e2).unwrap();
+        sim_run(&args[2], -1.0).unwrap();
     }
     else {
-        render_run(&args[1], 10.0).await;
+        render_run(&args[1], -1.0).await;
     }
 }

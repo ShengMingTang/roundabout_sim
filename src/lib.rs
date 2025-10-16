@@ -32,7 +32,7 @@ pub struct Car {
 
 const DIST_ALLOW: f32 = 1e-2;
 const THETA_ALLOW: f32 = 1e-2 * PI;
-const SAFE_DISTANCE: f32 = 1e-2;
+const SAFE_RATIO: f32 = 1e-3;
 
 fn unwrap_theta(theta: f32) -> f32 {
     if theta < 0.0 {
@@ -169,7 +169,7 @@ impl RoundaboutSimSetting {
             let mut cjson = Car {
                 id,
                 pos: Complex::default(),
-                vel: rand::random(),
+                vel: rand::random::<f32>() + 0.2,
                 lane: rand::random_range(0..r_lanes.len()),
                 dst: Complex::default(),
                 action: Action::Straight,
@@ -454,6 +454,7 @@ impl RoundaboutSim {
         Check return value <= 0 as a signal to update @car_follow or not
     */
     fn straight_collision(&self, car_follow: &Car, car_precede: &Car) -> f32 {
+        let SAFE_DISTANCE = self.setting.r_lanes[0] * SAFE_RATIO;
         match car_follow.action {
             Action::Straight => {
                 assert_eq!(car_follow.lane, car_precede.lane,
@@ -481,7 +482,7 @@ pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
     println!("sim init: {sim:?}");
     let mut finished = false;
-    while sim.t < max_t && finished == false {
+    while (sim.t < max_t || max_t < 0.0) && finished == false {
         finished |= sim.update();
     }
     return if finished {

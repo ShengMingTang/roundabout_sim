@@ -60,7 +60,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     /**
         Verify straight-first by check their completion order
     */
