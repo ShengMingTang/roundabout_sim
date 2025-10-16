@@ -1,7 +1,6 @@
 {
     "comment": "Order: 2,1,0: all cars near the end, car 1 > pi/2 (straight), car 2 < pi/2 (straight) should finish before car 0 (switching out with long distance)",
     "n_inter": 30,
-    "n_cars": 2,
     "r_lanes": [1.0, 0.1],
     "tick": 0.1,
     "switch_policy": "StraightFirst",

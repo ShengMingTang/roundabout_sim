@@ -1,7 +1,6 @@
 {
     "comment": "a single car on only one lane, go straight until the end",
     "n_inter": 2,
-    "n_cars": 1,
     "r_lanes": [1.0],
     "tick": 0.1,
     "init": {

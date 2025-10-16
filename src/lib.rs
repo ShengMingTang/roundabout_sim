@@ -134,7 +134,6 @@ pub enum SwitchPolicy { // Handles the collision arising from switch to another 
 #[derive(Debug)]
 pub struct RoundaboutSimSetting {
     n_inter: usize, // intersection
-    n_cars: usize, // no. cars
     r_lanes: Vec<f32>, // radius of each lane
     tick: f32, // simulation update interval
     switch_policy: SwitchPolicy,
@@ -143,7 +142,6 @@ impl RoundaboutSimSetting {
     pub fn default() -> RoundaboutSimSetting {
         RoundaboutSimSetting {
             n_inter: 2,
-            n_cars: 1,
             r_lanes: vec![1.0],
             tick: 0.1,
             switch_policy: SwitchPolicy::StraightFirst,
@@ -152,7 +150,6 @@ impl RoundaboutSimSetting {
     pub fn to_json(&self) -> JsonValue {
         object!{
             n_inter: self.n_inter,
-            n_cars: self.n_cars,
             tick: self.tick,
             r_lanes: self.r_lanes.clone(),
         }
@@ -175,7 +172,6 @@ impl RoundaboutSimSetting {
         }
         let setting = RoundaboutSimSetting {
             n_inter: n_cars,
-            n_cars,
             ..RoundaboutSimSetting::default()
         };
         let mut jobj = setting.to_json();
@@ -192,7 +188,6 @@ impl RoundaboutSimSetting {
         assert!(r_lanes.len() > 0 && r_lanes_reverse.is_sorted(), "lanes should be of len > 0 and sorted in decreasing order");
         let ret = RoundaboutSimSetting {
             n_inter: jobj["n_inter"].as_usize()?,
-            n_cars: jobj["n_cars"].as_usize()?,
             r_lanes,
             tick: jobj["tick"].as_f32()?,
             switch_policy: if jobj.has_key("switch_policy") {

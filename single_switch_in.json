@@ -1,7 +1,6 @@
 {
     "comment": "a single car that should switch in/straight then out",
     "n_inter": 2,
-    "n_cars": 1,
     "r_lanes": [1.0, 0.5],
     "tick": 0.1,
     "init": {

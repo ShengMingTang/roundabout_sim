@@ -1,7 +1,6 @@
 {
     "comment": "car 1 (fast) should always be blocked by car 0 (slow)",
     "n_inter": 2,
-    "n_cars": 2,
     "tick": 0.1,
     "r_lanes": [
         1

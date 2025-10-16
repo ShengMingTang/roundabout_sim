@@ -1,7 +1,6 @@
 {
     "comment": "all cars near the end, car 1 (straight) should finish before car 0 (switching out)",
     "n_inter": 2,
-    "n_cars": 2,
     "r_lanes": [1.0, 0.5],
     "tick": 0.1,
     "switch_policy": "StraightFirst",
