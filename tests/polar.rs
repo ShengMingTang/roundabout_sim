@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 use num_complex::Complex;
 use std::f32::consts::PI;
 

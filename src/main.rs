@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 use macroquad::prelude::*;
 use roundabout_sim::*;
 use json;

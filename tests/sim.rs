@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 use roundabout_sim::*;
 use std::f32::consts::PI;
 use approx::{assert_abs_diff_eq, assert_relative_eq};
