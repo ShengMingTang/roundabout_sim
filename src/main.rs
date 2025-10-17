@@ -13,7 +13,10 @@ fn help() {
 #[macroquad::main("Roundabout")]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    if args[1] == "gen_random" {
+    if args.len() < 2 || args[1] == "help" {
+        help();
+    }
+    else if args[1] == "gen_random" {
         if args.len() < 5 {
             help();
         }

@@ -66,5 +66,6 @@ mod tests {
     fn long_test() {
         sim_run("rand_30_4_5..1.json", 3000.0).unwrap();
         sim_run("rand_300_8_5..1.json", 3000.0).unwrap();
+        sim_run("rand_3000_8_6..1.json", 3000.0).unwrap();
     }
 }

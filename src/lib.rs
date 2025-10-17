@@ -32,7 +32,7 @@ pub struct Car {
 
 const DIST_ALLOW: f32 = 1e-2;
 const THETA_ALLOW: f32 = 1e-2 * PI;
-const MIN_UPDATE_TICK: f32 = 5.0 * 1e-1;
+const MIN_UPDATE_TICK: f32 = 1e-2;
 
 fn unwrap_theta(theta: f32) -> f32 {
     if theta < 0.0 {
@@ -316,7 +316,7 @@ impl RoundaboutSim {
             );
             if time_to_collide <= MIN_UPDATE_TICK {
                 car_follow.set_action(Action::Stop);
-                println!("Car {} makes Car {} stop", car_follow.id, car_precede.id);
+                // println!("Car {} makes Car {} stop", car_follow.id, car_precede.id);
                 f32::MAX
             }
             else {
@@ -332,7 +332,7 @@ impl RoundaboutSim {
                     );
                     if this_tick < tick {
                         tick = this_tick;
-                        println!("Car {} and Car {} restrict update time to {}", car_follow.borrow().id, car_precede.borrow().id, this_tick)
+                        // println!("Car {} and Car {} restrict update time to {}", car_follow.borrow().id, car_precede.borrow().id, this_tick)
                     }
                 }
             }
@@ -393,6 +393,7 @@ impl RoundaboutSim {
         // TODO: Another chance for changing their actions?
         // update phase
         let mut next_cars = vec![];
+        let n_cars = self.finished_cars.len() + self.cars.len();
         for car in self.cars.iter() {
             {
                 car.borrow_mut().update(tick, setting);
@@ -407,6 +408,10 @@ impl RoundaboutSim {
             if car.borrow().finished() {
                 self.finished_cars.push(car.clone());
                 has_progress = true;
+                println!("Car {} finishes at time {}, ({} / {n_cars})",
+                    car.borrow().id, self.t,
+                    self.finished_cars.len()
+                );
             }
             else {
                 next_cars.push(car.clone());
@@ -415,9 +420,14 @@ impl RoundaboutSim {
         self.cars = next_cars;
         let all_finished = self.cars.len() == 0;
         assert!(has_progress || all_finished, "everyone stops but not finished");
-        println!("===== t: {} (+{}) =====", self.t, tick);
-        for car in &self.cars {
-            println!("id: {}: {:?}", car.borrow().id, car.borrow());
+        if all_finished {
+            println!("===== simulation finished in: {} =====", self.t);
+        }
+        else {
+            // println!("===== t: {} (+{}) =====", self.t, tick);
+            // for car in &self.cars {
+            //     println!("id: {}: {:?}", car.borrow().id, car.borrow());
+            // }            
         }
         all_finished
     }

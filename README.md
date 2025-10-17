@@ -29,6 +29,9 @@ Simulation of cars running on a multi-lane roundabout.
 }
 ```
 # Demo
-``` $ cargo run -- <path_to_json> ``` for running one configuration
+``` $ cargo run -- <path_to_json> ``` for running one configuration with rendering
+
+``` $ cargo run -- headless <path_to_json> ``` for running one configuration in pure text
+
 # Todo
 1. Draw roundabout, cars (with action)
