@@ -32,7 +32,7 @@ pub struct Car {
 
 const DIST_ALLOW: f32 = 1e-2;
 const THETA_ALLOW: f32 = 1e-2 * PI;
-const SAFE_RATIO: f32 = 1e-3;
+const MIN_UPDATE_TICK: f32 = 5.0 * 1e-1;
 
 fn unwrap_theta(theta: f32) -> f32 {
     if theta < 0.0 {
@@ -103,7 +103,7 @@ impl Car {
                 if *diff_lane < 0 && next_r >= target_r || /* switch out */
                    *diff_lane > 0 && next_r <= target_r    /* switch in */ {
                     self.pos = Complex::from_polar(target_r, self.pos.arg());
-                    self.lane = ((self.lane as i32)+ diff_lane) as usize;
+                    self.lane = ((self.lane as i32) + diff_lane) as usize;
                 }
                 else {
                     self.pos = Complex::from_polar(next_r, self.pos.arg());
@@ -269,7 +269,7 @@ impl RoundaboutSim {
                 vel: value["vel"].as_f32()?,
                 lane,
                 dst: Complex::from_polar(setting.r_lanes[0], 2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?),
-                action: Action::Switch(0),
+                action: Action::Straight,
             })))
         }
         Some(RoundaboutSim {
@@ -314,9 +314,9 @@ impl RoundaboutSim {
                 car_follow,
                 car_precede,
             );
-            if time_to_collide <= 0.0 {
+            if time_to_collide <= MIN_UPDATE_TICK {
                 car_follow.set_action(Action::Stop);
-                println!("Car {} must be behind Car {}", car_follow.id, car_precede.id);
+                println!("Car {} makes Car {} stop", car_follow.id, car_precede.id);
                 f32::MAX
             }
             else {
@@ -326,12 +326,14 @@ impl RoundaboutSim {
         for (lane, same_lane) in &by_lane {
             for (i, car_follow) in same_lane.iter().enumerate() {
                 if let Some(ref car_precede) = same_lane.get((i + 1) % same_lane.len()) && same_lane.len() > 1 {
-                    tick = f32::min(
-                        possible_straight_collision(
+                    let this_tick = possible_straight_collision(
                             &mut car_follow.borrow_mut(),
-                            &car_precede.borrow()),
-                        tick
+                            &car_precede.borrow()
                     );
+                    if this_tick < tick {
+                        tick = this_tick;
+                        println!("Car {} and Car {} restrict update time to {}", car_follow.borrow().id, car_precede.borrow().id, this_tick)
+                    }
                 }
             }
         }
@@ -454,7 +456,6 @@ impl RoundaboutSim {
         Check return value <= 0 as a signal to update @car_follow or not
     */
     fn straight_collision(&self, car_follow: &Car, car_precede: &Car) -> f32 {
-        let SAFE_DISTANCE = self.setting.r_lanes[0] * SAFE_RATIO;
         match car_follow.action {
             Action::Straight => {
                 assert_eq!(car_follow.lane, car_precede.lane,
@@ -463,13 +464,9 @@ impl RoundaboutSim {
                 assert_ne!(car_follow.id, car_precede.id,
                     "have the same id"
                 );
-                if (car_precede.pos - car_follow.pos).norm() < SAFE_DISTANCE &&
-                    (car_precede.pos / car_follow.pos).arg() > 0.0 {
-                    return 0.0;
-                }
-                let margin_theta = unwrap_theta((car_precede.pos / car_follow.pos).arg());
+                let margin_theta = unwrap_theta((car_precede.pos.fdiv(car_follow.pos)).arg());
                 let lane = car_follow.lane;
-                margin_theta / (car_follow.vel / self.setting.r_lanes[lane])
+                margin_theta * self.setting.r_lanes[lane] / car_follow.vel
             },
             _ => {return f32::MAX;},
         }
