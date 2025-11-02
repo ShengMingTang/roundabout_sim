@@ -21,7 +21,44 @@ enum Action {
     Stop,
 }
 
-#[derive(Debug)]
+pub trait Driver {
+    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, others: &Vec<Shared<Car>>) -> Action;
+}
+
+struct SimpleDriver;
+impl Driver for SimpleDriver {
+    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, others: &Vec<Shared<Car>>) -> Action {
+        let car = &car.borrow();
+        let rem_theta = (car.dst / car.pos).to_polar().1.abs(); // remaining
+        if car.finished() { // finished
+            Action::Stop
+        }
+        else if car.lane > 0 && rem_theta <= THETA_ALLOW { // switch out
+            Action::Switch(-1)
+        }
+        else { // greedy
+            // cost for straight then switch out
+            let r0 = setting.r_lanes[0];
+            let r_curr = setting.r_lanes[car.lane];
+            let unwrapped_theta = unwrap_theta((car.dst / car.pos).arg());
+            // (arc) + (switch out)
+            let straight_dist = (r_curr * unwrapped_theta) + (r0 - r_curr);
+            let switch_in_dist = if car.lane >= setting.r_lanes.len() - 1 { // can't switch in
+                std::f32::INFINITY
+            } else { // 2 * (switch one in/out) + (inner arc) + (switch from curr to outter most)
+                let r_inner = setting.r_lanes[car.lane + 1];
+                (2.0 * r_inner) + (r_inner * unwrapped_theta) + (r0 - r_curr)
+            };
+            
+            if switch_in_dist < straight_dist && car.lane < setting.r_lanes.len() - 1 {
+                Action::Switch(1)
+            } else {
+                Action::Straight
+            }
+        }
+    }
+}
+
 pub struct Car {
     pub id: usize,
     pos: Complex<f32>, // to tacke polar
@@ -29,6 +66,7 @@ pub struct Car {
     lane: usize, // 0 is the outermost
     dst: Complex<f32>, // destination polar
     action: Action,
+    driver: Box<dyn Driver>, // driver to drive this car
 }
 
 const DIST_ALLOW: f32 = 1e-2;
@@ -54,38 +92,6 @@ impl Car {
     }
     fn finished(&self) -> bool {        
         self.lane == 0 && (self.dst - self.pos).norm() <= DIST_ALLOW
-    }
-    /**
-        provide an action
-    */
-    fn action(&self, setting: &RoundaboutSimSetting) -> Action {
-        let rem_theta = (self.dst / self.pos).to_polar().1.abs(); // remaining
-        if self.finished() { // finished
-            Action::Stop
-        }
-        else if self.lane > 0 && rem_theta <= THETA_ALLOW { // switch out
-            Action::Switch(-1)
-        }
-        else { // greedy
-            // cost for straight then switch out
-            let r0 = setting.r_lanes[0];
-            let r_curr = setting.r_lanes[self.lane];
-            let unwrapped_theta = unwrap_theta((self.dst / self.pos).arg());
-            // (arc) + (switch out)
-            let straight_dist = (r_curr * unwrapped_theta) + (r0 - r_curr);
-            let switch_in_dist = if self.lane >= setting.r_lanes.len() - 1 { // can't switch in
-                std::f32::INFINITY
-            } else { // 2 * (switch one in/out) + (inner arc) + (switch from curr to outter most)
-                let r_inner = setting.r_lanes[self.lane + 1];
-                (2.0 * r_inner) + (r_inner * unwrapped_theta) + (r0 - r_curr)
-            };
-            
-            if switch_in_dist < straight_dist && self.lane < setting.r_lanes.len() - 1 {
-                Action::Switch(1)
-            } else {
-                Action::Straight
-            }
-        }
     }
     /**
         called when action is granted
@@ -174,6 +180,7 @@ impl RoundaboutSimSetting {
                 lane: rand::random_range(0..r_lanes.len()),
                 dst: Complex::default(),
                 action: Action::Straight,
+                driver: Box::new(SimpleDriver{}),
             }.to_json();
             cjson["dst"] = rand::random_range(0..n_inter).into();
             cjson["theta"] = (rand::random::<f32>() * 2.0 * PI).into();
@@ -199,6 +206,7 @@ impl RoundaboutSimSetting {
                 lane: 0,
                 dst: Complex::default(),
                 action: Action::Straight,
+                driver: Box::new(SimpleDriver{})
             }.to_json();
             cjson["dst"] = ((id + 1) % n_cars).into();
             cjson["theta"] = (2.0 * PI / (n_cars as f32) * (id as f32)).into();
@@ -244,7 +252,6 @@ impl RoundaboutSimSetting {
     }
 }
 
-#[derive(Debug)]
 pub struct RoundaboutSim {
     pub t: f32, // current time,
     pub setting: RoundaboutSimSetting,
@@ -271,6 +278,7 @@ impl RoundaboutSim {
                 lane,
                 dst: Complex::from_polar(setting.r_lanes[0], 2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?),
                 action: Action::Straight,
+                driver: Box::new(SimpleDriver{}),
             })))
         }
         Some(RoundaboutSim {
@@ -305,7 +313,7 @@ impl RoundaboutSim {
         // every car determines its action
         for car in &self.cars {
             let action = {
-                car.borrow().action(setting)
+                car.borrow().driver.drive(car.clone(), setting, &self.cars)
             };
             car.borrow_mut().set_action(action);
         }
@@ -488,7 +496,6 @@ impl RoundaboutSim {
 
 pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
-    println!("sim init: {sim:?}");
     let mut finished = false;
     while (sim.t < max_t || max_t < 0.0) && finished == false {
         finished |= sim.update();
