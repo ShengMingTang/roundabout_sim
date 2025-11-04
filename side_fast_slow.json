@@ -1,0 +1,20 @@
+{
+    "comment": "two cars switching out, the slow one (inner) should stop the fast one (outer)",
+    "n_inter": 2,
+    "r_lanes": [2.0, 0.5, 0.4],
+    "tick": 0.1,
+    "init": {
+        "0": {
+            "dst": 1,
+            "vel": 0.1,
+            "lane": 1,
+            "theta": 3.14159
+        },
+        "1": {
+            "dst": 1,
+            "vel": 1.0,
+            "lane": 2,
+            "theta": 3.14159
+        }
+    }
+}

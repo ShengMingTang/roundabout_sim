@@ -27,7 +27,7 @@ pub trait Driver {
 
 struct SimpleDriver;
 impl Driver for SimpleDriver {
-    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, others: &Vec<Shared<Car>>) -> Action {
+    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, _others: &Vec<Shared<Car>>) -> Action {
         let car = &car.borrow();
         let rem_theta = (car.dst / car.pos).to_polar().1.abs(); // remaining
         if car.finished() { // finished
@@ -332,7 +332,7 @@ impl RoundaboutSim {
                 time_to_collide
             }
         };
-        for (lane, same_lane) in &by_lane {
+        for (_lane, same_lane) in &by_lane {
             for (i, car_follow) in same_lane.iter().enumerate() {
                 if let Some(ref car_precede) = same_lane.get((i + 1) % same_lane.len()) && same_lane.len() > 1 {
                     let this_tick = possible_straight_collision(
@@ -395,6 +395,70 @@ impl RoundaboutSim {
                     },
                     _ => {},
                 }                
+            }
+        }
+        // detect side collision
+        // returns true if car_other falls in the neighborhood of car_center
+        let in_side_coliision_range = |car_center: &Car, car_other: &Car, delta: f32| -> bool {
+            let diff = (car_center.pos / car_other.pos).arg();
+            diff.abs() < delta
+        };
+        let possible_side_collision = |car_center: &Car, car_other: &Car, tick: f32| -> f32 {
+            if let Action::Switch(car_diff) = car_center.action {
+                if let Action::Switch(ref other_diff) = car_other.action {
+                    let car_r = car_center.pos.norm();
+                    let other_r = car_other.pos.norm();
+                    // both switch in/out, return time to collide if relative position correct
+                    return if car_diff == *other_diff && (car_diff as f32) * (car_r - other_r) > 0.0 {
+                        (car_r - other_r).abs() / car_center.vel
+                    } else {
+                        tick
+                    }
+                }
+            }
+            tick
+        };
+        let detect_side_collision_routine = |car_center: &mut Car, car_other: &Car, tick: f32| -> f32 {
+            let this_tick = possible_side_collision(car_center, car_other, tick);
+            return if this_tick < MIN_UPDATE_TICK {
+                car_center.set_action(Action::Stop);
+                // println!("Car {} stops Car {} ", car_other.id, car_center.id);
+                tick
+            }
+            else if this_tick < tick {
+                // println!("Car {} and Car {} restrict update time to {}", car_center.id, car_other.id, this_tick);
+                this_tick
+            }
+            else {
+                tick
+            }
+        };
+        for (_lane, same_lane) in &by_lane {
+            let n = same_lane.len();
+            for (i, car) in same_lane.iter().enumerate() {
+                let car_center = &mut car.borrow_mut();
+                if let Action::Switch(_diff) = car_center.action {
+                    // search through left
+                    let mut left = (i + (n - 1)) % n;
+                    while left != i {
+                        let car_other = &same_lane[left].borrow();
+                        if in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) == false {
+                            break;
+                        }
+                        tick = detect_side_collision_routine(car_center, car_other, tick);
+                        left = (left + (n - 1)) % n;
+                    }
+                    // search through right
+                    let mut right = (i + 1) % n;
+                    while right != i && right != left {
+                        let car_other = &same_lane[right].borrow();
+                        if in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) == false {
+                            break;
+                        }
+                        tick = detect_side_collision_routine(car_center, car_other, tick);
+                        right = (right + 1) % n;
+                    }
+                }
             }
         }
         self.t += tick;

@@ -1,0 +1,20 @@
+{
+    "comment": "two cars switching in/out, the two should collide",
+    "n_inter": 2,
+    "r_lanes": [2.0, 0.5],
+    "tick": 0.1,
+    "init": {
+        "0": {
+            "dst": 1,
+            "vel": 0.1,
+            "lane": 1,
+            "theta": 3.14159
+        },
+        "1": {
+            "dst": 0,
+            "vel": 0.1,
+            "lane": 0,
+            "theta": 3.14159
+        }
+    }
+}

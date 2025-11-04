@@ -3,7 +3,6 @@ use macroquad::prelude::*;
 use crate::*;
 use num_complex::Complex;
 use std::f32::consts::PI;
-use std::time::Duration;
 
 pub async fn render_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
