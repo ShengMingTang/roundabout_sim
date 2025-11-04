@@ -68,7 +68,7 @@ mod tests {
         check_completion_order("side_fast_slow.json", 30.0, &[0, 1]);
         // no collision
         assert_relative_eq!(sim_run("side_face_to_face.json", 60.0).unwrap().t, 
-            1.5 / 0.1 + 0.5 * PI / 0.1 + 1.5,
+            1.5 / 0.1 + 0.5 * PI / 0.1 + 1.5 / 0.1,
             max_relative = RELATIVE
         );
     }

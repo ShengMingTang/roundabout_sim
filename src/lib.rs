@@ -117,14 +117,13 @@ impl Car {
                 }
             },
             Action::Straight => {
-                let mv_theta = (self.vel * tick) / setting.r_lanes[self.lane];
-                let next_theta = unwrap_theta(self.pos.arg()) + mv_theta;
-                let target_theta = unwrap_theta(self.dst.arg());
-                if next_theta >= target_theta {
-                    self.pos = Complex::from_polar(self.pos.norm(), target_theta);
+                let mv = Complex::from_polar(1.0, (self.vel * tick) / setting.r_lanes[self.lane]);
+                let next_pos = self.pos * mv;
+                if (next_pos / self.dst).arg() > 0.0 && (self.pos / self.dst).arg() < 0.0 { // cross the dst
+                    self.pos = Complex::from_polar(setting.r_lanes[self.lane], self.dst.arg());
                 }
                 else {
-                    self.pos = Complex::from_polar(self.pos.norm(), next_theta);
+                    self.pos = next_pos;
                 }
             },
             Action::Stop => {},
