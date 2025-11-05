@@ -71,6 +71,8 @@ mod tests {
             1.5 / 0.1 + 0.5 * PI / 0.1 + 1.5 / 0.1,
             max_relative = RELATIVE
         );
+        // inward
+        check_completion_order("side_fast_slow_inward.json", 60.0, &[1, 0]);
     }
 
     #[test]

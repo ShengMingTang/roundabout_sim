@@ -43,11 +43,11 @@ impl Driver for SimpleDriver {
             let unwrapped_theta = unwrap_theta((car.dst / car.pos).arg());
             // (arc) + (switch out)
             let straight_dist = (r_curr * unwrapped_theta) + (r0 - r_curr);
-            let switch_in_dist = if car.lane >= setting.r_lanes.len() - 1 { // can't switch in
+            let switch_in_dist = if car.lane + 1 >= setting.r_lanes.len() { // can't switch in
                 std::f32::INFINITY
             } else { // 2 * (switch one in/out) + (inner arc) + (switch from curr to outter most)
                 let r_inner = setting.r_lanes[car.lane + 1];
-                (2.0 * r_inner) + (r_inner * unwrapped_theta) + (r0 - r_curr)
+                (2.0 * (r_curr - r_inner)) + (r_inner * unwrapped_theta) + (r0 - r_curr)
             };
             
             if switch_in_dist < straight_dist && car.lane < setting.r_lanes.len() - 1 {
@@ -350,6 +350,7 @@ impl RoundaboutSim {
             if self.switch_collision(switching_car, car_follow, tick) {
                 match setting.switch_policy {
                     SwitchPolicy::StraightFirst => {
+                        // TODO: may remove this line
                         switching_car.pos = Complex::from_polar(setting.r_lanes[switching_car.lane], switching_car.pos.arg());
                         switching_car.set_action(Action::Stop);
                     },
