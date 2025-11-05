@@ -10,54 +10,18 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::{HashMap};
 use ordered_float::OrderedFloat;
-use rand;
 
-type Shared<T> = Rc<RefCell<T>>;
+pub mod setting;
+pub mod drivers;
+mod common;
 
-#[derive(Debug)]
-enum Action {
-    Switch(i32), // switch in/out, > 0 means to inner, == 0 means stop
-    Straight,
-    Stop,
-}
+pub use setting::RoundaboutSimSetting;
+use setting::SwitchPolicy;
+pub use drivers::{DriverFactory, Driver};
+use common::{Action, Shared, unwrap_theta, THETA_ALLOW};
 
-pub trait Driver {
-    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, others: &Vec<Shared<Car>>) -> Action;
-}
-
-struct SimpleDriver;
-impl Driver for SimpleDriver {
-    fn drive(&self, car: Shared<Car>, setting: &RoundaboutSimSetting, _others: &Vec<Shared<Car>>) -> Action {
-        let car = &car.borrow();
-        let rem_theta = (car.dst / car.pos).to_polar().1.abs(); // remaining
-        if car.finished() { // finished
-            Action::Stop
-        }
-        else if car.lane > 0 && rem_theta <= THETA_ALLOW { // switch out
-            Action::Switch(-1)
-        }
-        else { // greedy
-            // cost for straight then switch out
-            let r0 = setting.r_lanes[0];
-            let r_curr = setting.r_lanes[car.lane];
-            let unwrapped_theta = unwrap_theta((car.dst / car.pos).arg());
-            // (arc) + (switch out)
-            let straight_dist = (r_curr * unwrapped_theta) + (r0 - r_curr);
-            let switch_in_dist = if car.lane + 1 >= setting.r_lanes.len() { // can't switch in
-                std::f32::INFINITY
-            } else { // 2 * (switch one in/out) + (inner arc) + (switch from curr to outter most)
-                let r_inner = setting.r_lanes[car.lane + 1];
-                (2.0 * (r_curr - r_inner)) + (r_inner * unwrapped_theta) + (r0 - r_curr)
-            };
-            
-            if switch_in_dist < straight_dist && car.lane < setting.r_lanes.len() - 1 {
-                Action::Switch(1)
-            } else {
-                Action::Straight
-            }
-        }
-    }
-}
+const DIST_ALLOW: f32 = 1e-2;
+const MIN_UPDATE_TICK: f32 = 1e-2;
 
 pub struct Car {
     pub id: usize,
@@ -69,27 +33,7 @@ pub struct Car {
     driver: Box<dyn Driver>, // driver to drive this car
 }
 
-const DIST_ALLOW: f32 = 1e-2;
-const THETA_ALLOW: f32 = 1e-2 * PI;
-const MIN_UPDATE_TICK: f32 = 1e-2;
-
-fn unwrap_theta(theta: f32) -> f32 {
-    if theta < 0.0 {
-        theta + 2.0 * PI
-    } else {
-        theta
-    }
-}
-
 impl Car {
-    fn to_json(&self) -> JsonValue {
-        object!{
-            vel: self.vel,
-            lane: self.lane,
-            dst: self.dst.to_string(),
-            theta: self.pos.to_polar().1,
-        }
-    }
     fn finished(&self) -> bool {        
         self.lane == 0 && (self.dst - self.pos).norm() <= DIST_ALLOW
     }
@@ -131,126 +75,6 @@ impl Car {
     }
 }
 
-#[derive(Debug)]
-pub enum SwitchPolicy { // Handles the collision arising from switch to another lane
-    SwitchFirst,
-    StraightFirst,
-    // Random(f32), // switch will succed with probability f32, but this will create an imprecise simulation 
-}
-
-#[derive(Debug)]
-pub struct RoundaboutSimSetting {
-    n_inter: usize, // intersection
-    r_lanes: Vec<f32>, // radius of each lane
-    tick: f32, // simulation update interval
-    switch_policy: SwitchPolicy,
-}
-impl RoundaboutSimSetting {
-    pub fn default() -> RoundaboutSimSetting {
-        RoundaboutSimSetting {
-            n_inter: 2,
-            r_lanes: vec![1.0],
-            tick: 0.1,
-            switch_policy: SwitchPolicy::SwitchFirst,
-        }
-    }
-    pub fn to_json(&self) -> JsonValue {
-        object!{
-            n_inter: self.n_inter,
-            tick: self.tick,
-            r_lanes: self.r_lanes.clone(),
-        }
-    }
-    pub fn gen_random(n_cars: usize, n_inter: usize, r_lanes: &[f32]) -> JsonValue {
-        assert!(n_cars > 0);
-        assert!(n_inter > 0);
-        assert!(r_lanes.len() > 0);
-        {
-            let mut r_lanes_reverse = r_lanes.to_vec();
-            r_lanes_reverse.reverse();
-            assert!(r_lanes_reverse.is_sorted());
-        }
-        let mut cars_json = JsonValue::new_object();
-        for id in 0..n_cars {
-            let mut cjson = Car {
-                id,
-                pos: Complex::default(),
-                vel: rand::random::<f32>() + 0.2,
-                lane: rand::random_range(0..r_lanes.len()),
-                dst: Complex::default(),
-                action: Action::Straight,
-                driver: Box::new(SimpleDriver{}),
-            }.to_json();
-            cjson["dst"] = rand::random_range(0..n_inter).into();
-            cjson["theta"] = (rand::random::<f32>() * 2.0 * PI).into();
-            cars_json[id.to_string()] = cjson;
-        }
-        let setting = RoundaboutSimSetting {
-            n_inter,
-            r_lanes: r_lanes.to_vec(),
-            ..RoundaboutSimSetting::default()
-        };
-        let mut jobj = setting.to_json();
-        jobj["init"] = cars_json;
-        jobj
-    }
-    pub fn gen_circular(n_cars: usize) -> JsonValue {
-        assert!(n_cars > 0);
-        let mut cars_json = JsonValue::new_object();
-        for id in 0..n_cars {
-            let mut cjson = Car {
-                id,
-                pos: Complex::default(),
-                vel: 1.0,
-                lane: 0,
-                dst: Complex::default(),
-                action: Action::Straight,
-                driver: Box::new(SimpleDriver{})
-            }.to_json();
-            cjson["dst"] = ((id + 1) % n_cars).into();
-            cjson["theta"] = (2.0 * PI / (n_cars as f32) * (id as f32)).into();
-            cars_json[id.to_string()] = cjson;
-        }
-        let setting = RoundaboutSimSetting {
-            n_inter: n_cars,
-            ..RoundaboutSimSetting::default()
-        };
-        let mut jobj = setting.to_json();
-        jobj["init"] = cars_json;
-        jobj
-    }
-    pub fn new(jobj: &JsonValue) -> Option<RoundaboutSimSetting> {
-        let mut r_lanes = vec![];
-        for it in jobj["r_lanes"].members() {
-            r_lanes.push(it.as_f32()?);
-        }
-        {
-            let mut r_lanes_reverse = r_lanes.clone();
-            r_lanes_reverse.reverse();
-            assert!(r_lanes.len() > 0 && r_lanes_reverse.is_sorted(), "lanes should be of len > 0 and sorted in decreasing order");
-        }
-        let ret = RoundaboutSimSetting {
-            n_inter: jobj["n_inter"].as_usize()?,
-            r_lanes,
-            tick: jobj["tick"].as_f32()?,
-            switch_policy: if jobj.has_key("switch_policy") {
-                match jobj["switch_policy"].as_str()? {
-                    "SwitchFirst" => SwitchPolicy::SwitchFirst,
-                    _ => SwitchPolicy::StraightFirst,
-                }
-            } else {
-                RoundaboutSimSetting::default().switch_policy
-            },
-        };
-        if ret.r_lanes.len() == 0 {
-            None
-        }
-        else {
-            Some(ret)
-        }
-    }
-}
-
 pub struct RoundaboutSim {
     pub t: f32, // current time,
     pub setting: RoundaboutSimSetting,
@@ -277,7 +101,7 @@ impl RoundaboutSim {
                 lane,
                 dst: Complex::from_polar(setting.r_lanes[0], 2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?),
                 action: Action::Straight,
-                driver: Box::new(SimpleDriver{}),
+                driver: DriverFactory::default(),
             })))
         }
         Some(RoundaboutSim {
@@ -553,8 +377,6 @@ impl RoundaboutSim {
         }
     }
 }
-
-
 
 pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
