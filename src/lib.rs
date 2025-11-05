@@ -350,8 +350,6 @@ impl RoundaboutSim {
             if self.switch_collision(switching_car, car_follow, tick) {
                 match setting.switch_policy {
                     SwitchPolicy::StraightFirst => {
-                        // TODO: may remove this line
-                        switching_car.pos = Complex::from_polar(setting.r_lanes[switching_car.lane], switching_car.pos.arg());
                         switching_car.set_action(Action::Stop);
                     },
                     _ => {
