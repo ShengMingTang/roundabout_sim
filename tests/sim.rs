@@ -18,10 +18,10 @@ mod tests {
 
     #[test]
     fn sim_single_test() {
-        assert_relative_eq!(sim_run("single.json", 10.0).unwrap().t, PI, max_relative = RELATIVE);
-        assert_abs_diff_eq!(sim_run("single_finish.json", 10.0).unwrap().t, 0.0, epsilon = RELATIVE);
-        assert_relative_eq!(sim_run("single_switch_in.json", 10.0).unwrap().t, 2.57, max_relative = RELATIVE);
-        assert_relative_eq!(sim_run("single_no_switch.json", 10.0).unwrap().t, 0.64, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/single.json", 10.0).unwrap().t, PI, max_relative = RELATIVE);
+        assert_abs_diff_eq!(sim_run("test_jsons/single_finish.json", 10.0).unwrap().t, 0.0, epsilon = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/single_switch_in.json", 10.0).unwrap().t, 2.57, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/single_no_switch.json", 10.0).unwrap().t, 0.64, max_relative = RELATIVE);
     }
 
     #[test]
@@ -30,9 +30,9 @@ mod tests {
         Ensure every one finishes
     */
     fn sim_circular_deadlock_test() {
-        assert_relative_eq!(sim_run("circular_4.json", 10.0).unwrap().t, 2.0 * PI / 4.0, max_relative = RELATIVE);
-        assert_relative_eq!(sim_run("circular_36.json", 10.0).unwrap().t, 2.0 * PI / 36.0, max_relative = RELATIVE);
-        assert_relative_eq!(sim_run("circular_360.json", 10.0).unwrap().t, 2.0 * PI / 360.0, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/circular_4.json", 10.0).unwrap().t, 2.0 * PI / 4.0, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/circular_36.json", 10.0).unwrap().t, 2.0 * PI / 36.0, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/circular_360.json", 10.0).unwrap().t, 2.0 * PI / 360.0, max_relative = RELATIVE);
     }
 
     #[test]
@@ -40,7 +40,7 @@ mod tests {
         single lane, fast slow test, simulation ends with the slower one
     */
     fn sim_fast_slow_test() {
-        assert_relative_eq!(sim_run("fast_slow_2.json", 10.0).unwrap().t, (PI - 0.2) / 0.5 + 0.1, max_relative = RELATIVE);
+        assert_relative_eq!(sim_run("test_jsons/fast_slow_2.json", 10.0).unwrap().t, (PI - 0.2) / 0.5 + 0.1, max_relative = RELATIVE);
     }
 
     #[test]
@@ -48,16 +48,16 @@ mod tests {
         Verify switch-first by check their completion order
     */
     fn sim_switch_first_policy() {
-        check_completion_order("first_switch.json", 10.0, &[0, 1]);
-        check_completion_order("first_switch_3.json", 10.0, &[0, 1, 2]);
+        check_completion_order("test_jsons/first_switch.json", 10.0, &[0, 1]);
+        check_completion_order("test_jsons/first_switch_3.json", 10.0, &[0, 1, 2]);
     }
     #[test]
     /**
         Verify straight-first by check their completion order
     */
     fn sim_straight_first_policy() {
-        check_completion_order("first_straight.json", 10.0, &[1, 0]);
-        check_completion_order("first_straight_3.json", 10.0, &[2, 1, 0]);
+        check_completion_order("test_jsons/first_straight.json", 10.0, &[1, 0]);
+        check_completion_order("test_jsons/first_straight_3.json", 10.0, &[2, 1, 0]);
     }
 
     #[test]
@@ -65,14 +65,14 @@ mod tests {
         Verify straight-first by check their completion order
     */
     fn sim_side_collision() {
-        check_completion_order("side_fast_slow.json", 30.0, &[0, 1]);
+        check_completion_order("test_jsons/side_fast_slow.json", 30.0, &[0, 1]);
         // no collision
-        assert_relative_eq!(sim_run("side_face_to_face.json", 60.0).unwrap().t, 
+        assert_relative_eq!(sim_run("test_jsons/side_face_to_face.json", 60.0).unwrap().t, 
             1.5 / 0.1 + 0.5 * PI / 0.1 + 1.5 / 0.1,
             max_relative = RELATIVE
         );
         // inward
-        check_completion_order("side_fast_slow_inward.json", 60.0, &[1, 0]);
+        check_completion_order("test_jsons/side_fast_slow_inward.json", 60.0, &[1, 0]);
     }
 
     #[test]
@@ -80,8 +80,8 @@ mod tests {
         Verify straight-first by check their completion order
     */
     fn long_test() {
-        sim_run("rand_30_4_5..1.json", 3000.0).unwrap();
-        sim_run("rand_300_8_5..1.json", 3000.0).unwrap();
-        sim_run("rand_3000_8_6..1.json", 3000.0).unwrap();
+        sim_run("test_jsons/rand_30_4_5..1.json", 3000.0).unwrap();
+        sim_run("test_jsons/rand_300_8_5..1.json", 3000.0).unwrap();
+        sim_run("test_jsons/rand_3000_8_6..1.json", 3000.0).unwrap();
     }
 }
