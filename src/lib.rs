@@ -101,6 +101,7 @@ impl RoundaboutSim {
                 lane,
                 dst: Complex::from_polar(setting.r_lanes[0], 2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?),
                 action: Action::Straight,
+                // TODO: may be provided from setting
                 driver: DriverFactory::default(),
             })))
         }

@@ -1,6 +1,6 @@
 use json::{JsonValue, object};
 use std::f32::consts::PI;
-
+use crate::DriverFactory;
 #[derive(Debug)]
 pub enum SwitchPolicy { // Handles the collision arising from switch to another lane
     SwitchFirst,
@@ -14,6 +14,7 @@ pub struct RoundaboutSimSetting {
     pub r_lanes: Vec<f32>, // radius of each lane
     pub tick: f32, // simulation update interval
     pub switch_policy: SwitchPolicy,
+    // TODO: may provide DriverFactory so that other does not need to know detail
 }
 
 impl RoundaboutSimSetting {
@@ -30,6 +31,7 @@ impl RoundaboutSimSetting {
             n_inter: self.n_inter,
             tick: self.tick,
             r_lanes: self.r_lanes.clone(),
+            switch_policy: format!("{:?}", SwitchPolicy::StraightFirst),
         }
     }
     pub fn gen_random(n_cars: usize, n_inter: usize, r_lanes: &[f32]) -> JsonValue {

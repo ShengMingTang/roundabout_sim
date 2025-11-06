@@ -11,6 +11,7 @@ pub async fn render_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
         finished |= sim.update();
         render_update(&mut sim);
         next_frame().await
+        // TODO: delay such that simulation time is proportional to wall clock time
     }
     Some(sim)
 }
