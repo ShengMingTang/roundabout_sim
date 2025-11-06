@@ -5,11 +5,12 @@ use json;
 use std::env;
 
 fn help() {
-    println!("     : cargo run --bin roundabout_sim -- <path_to_json>");
+    println!("     : cargo run -- <path_to_json>");
+    println!("usage: cargo run -- gen_circular <n_cars>");
+    println!("usage: cargo run -- gen_random <n_cars> <n_inter> <r_lanes[0]> <r_lanes[1]> ...");
 }
 
-#[macroquad::main("Roundabout")]
-async fn main() {
+fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 || args[1] == "help" {
         help();
@@ -36,6 +37,6 @@ async fn main() {
         println!("{}", json::stringify(jobj));
     }
     else {
-        render_run(&args[1], -1.0).await;
+        sim_run(&args[1], -1.0).unwrap();
     }
 }
