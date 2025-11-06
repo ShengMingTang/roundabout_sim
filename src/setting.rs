@@ -22,7 +22,7 @@ impl RoundaboutSimSetting {
             n_inter: 2,
             r_lanes: vec![1.0],
             tick: 0.1,
-            switch_policy: SwitchPolicy::SwitchFirst,
+            switch_policy: SwitchPolicy::StraightFirst,
         }
     }
     pub fn to_json(&self) -> JsonValue {
