@@ -2,23 +2,23 @@
 mod render;
 pub use crate::render::render_run;
 
-use json::{JsonValue, object};
+use json::JsonValue;
 use num_complex::Complex;
+use ordered_float::OrderedFloat;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::fs;
 use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::{HashMap};
-use ordered_float::OrderedFloat;
 
-pub mod setting;
-pub mod drivers;
 mod common;
+pub mod drivers;
+pub mod setting;
 
+use common::{Action, Shared, THETA_ALLOW, unwrap_theta};
+pub use drivers::{Driver, DriverFactory};
 pub use setting::RoundaboutSimSetting;
 use setting::SwitchPolicy;
-pub use drivers::{DriverFactory, Driver};
-use common::{Action, Shared, unwrap_theta, THETA_ALLOW};
 
 const DIST_ALLOW: f32 = 1e-2;
 const MIN_UPDATE_TICK: f32 = 1e-2;
@@ -27,19 +27,19 @@ pub struct Car {
     pub id: usize,
     pos: Complex<f32>, // to tacke polar
     vel: f32,
-    lane: usize, // 0 is the outermost
+    lane: usize,       // 0 is the outermost
     dst: Complex<f32>, // destination polar
     action: Action,
     driver: Box<dyn Driver>, // driver to drive this car
 }
 
 impl Car {
-    fn finished(&self) -> bool {        
+    fn finished(&self) -> bool {
         self.lane == 0 && (self.dst - self.pos).norm() <= DIST_ALLOW
     }
     /**
         called when action is granted
-    */    
+    */
     fn set_action(&mut self, action: Action) {
         self.action = action;
     }
@@ -52,25 +52,26 @@ impl Car {
                 let next_r = self.pos.norm() + ((-diff_lane as f32) * self.vel * tick);
                 let target_r = setting.r_lanes[((self.lane as i32) + diff_lane) as usize];
                 if *diff_lane < 0 && next_r >= target_r || /* switch out */
-                   *diff_lane > 0 && next_r <= target_r    /* switch in */ {
+                   *diff_lane > 0 && next_r <= target_r
+                /* switch in */
+                {
                     self.pos = Complex::from_polar(target_r, self.pos.arg());
                     self.lane = ((self.lane as i32) + diff_lane) as usize;
-                }
-                else {
+                } else {
                     self.pos = Complex::from_polar(next_r, self.pos.arg());
                 }
-            },
+            }
             Action::Straight => {
                 let mv = Complex::from_polar(1.0, (self.vel * tick) / setting.r_lanes[self.lane]);
                 let next_pos = self.pos * mv;
-                if (next_pos / self.dst).arg() > 0.0 && (self.pos / self.dst).arg() < 0.0 { // cross the dst
+                if (next_pos / self.dst).arg() > 0.0 && (self.pos / self.dst).arg() < 0.0 {
+                    // cross the dst
                     self.pos = Complex::from_polar(setting.r_lanes[self.lane], self.dst.arg());
-                }
-                else {
+                } else {
                     self.pos = next_pos;
                 }
-            },
-            Action::Stop => {},
+            }
+            Action::Stop => {}
         }
     }
 }
@@ -84,7 +85,7 @@ pub struct RoundaboutSim {
 
 impl RoundaboutSim {
     pub fn new(setting: RoundaboutSimSetting, jobj: &JsonValue) -> Option<RoundaboutSim> {
-        if jobj.has_key("init") == false {
+        if !jobj.has_key("init") {
             return None;
         }
         let jinit = &jobj["init"];
@@ -99,10 +100,13 @@ impl RoundaboutSim {
                 pos: Complex::from_polar(r, theta),
                 vel: value["vel"].as_f32()?,
                 lane,
-                dst: Complex::from_polar(setting.r_lanes[0], 2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?),
+                dst: Complex::from_polar(
+                    setting.r_lanes[0],
+                    2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?,
+                ),
                 action: Action::Straight,
                 // TODO: may be provided from setting
-                driver: DriverFactory::default(),
+                driver: DriverFactory::make_default_driver_boxed(),
             })))
         }
         Some(RoundaboutSim {
@@ -125,43 +129,39 @@ impl RoundaboutSim {
     */
     pub fn update(&mut self) -> bool {
         let setting = &self.setting;
-        let mut by_lane = HashMap::< usize, Vec< Shared<Car> > >::new();
+        let mut by_lane = HashMap::<usize, Vec<Shared<Car>>>::new();
         // TODO: Now is O(n lgn)
-        self.cars.sort_by_key(|car| {OrderedFloat(car.borrow().pos.arg())});
+        self.cars
+            .sort_by_key(|car| OrderedFloat(car.borrow().pos.arg()));
         for car in &self.cars {
-            let same_lane = by_lane.entry(car.borrow().lane)
-                .or_insert(vec![]);
+            let same_lane = by_lane.entry(car.borrow().lane).or_insert(vec![]);
             same_lane.push(car.clone());
         }
         let mut tick = setting.tick;
         // every car determines its action
         for car in &self.cars {
-            let action = {
-                car.borrow().driver.drive(car.clone(), setting, &self.cars)
-            };
+            let action = { car.borrow().driver.drive(car.clone(), setting, &self.cars) };
             car.borrow_mut().set_action(action);
         }
         // detect straight collision, happens to the same lane
         let possible_straight_collision = |car_follow: &mut Car, car_precede: &Car| {
-            let time_to_collide = self.straight_collision(
-                car_follow,
-                car_precede,
-            );
+            let time_to_collide = self.straight_collision(car_follow, car_precede);
             if time_to_collide <= MIN_UPDATE_TICK {
                 car_follow.set_action(Action::Stop);
                 // println!("Car {} makes Car {} stop", car_follow.id, car_precede.id);
                 f32::MAX
-            }
-            else {
+            } else {
                 time_to_collide
             }
         };
-        for (_lane, same_lane) in &by_lane {
+        for same_lane in by_lane.values() {
             for (i, car_follow) in same_lane.iter().enumerate() {
-                if let Some(ref car_precede) = same_lane.get((i + 1) % same_lane.len()) && same_lane.len() > 1 {
+                if let Some(car_precede) = same_lane.get((i + 1) % same_lane.len())
+                    && same_lane.len() > 1
+                {
                     let this_tick = possible_straight_collision(
-                            &mut car_follow.borrow_mut(),
-                            &car_precede.borrow()
+                        &mut car_follow.borrow_mut(),
+                        &car_precede.borrow(),
                     );
                     if this_tick < tick {
                         tick = this_tick;
@@ -176,10 +176,10 @@ impl RoundaboutSim {
                 match setting.switch_policy {
                     SwitchPolicy::StraightFirst => {
                         switching_car.set_action(Action::Stop);
-                    },
+                    }
                     _ => {
                         car_follow.set_action(Action::Stop);
-                    },
+                    }
                 }
             }
         };
@@ -187,37 +187,29 @@ impl RoundaboutSim {
             for car in same_lane {
                 let mut switching_car = car.borrow_mut();
                 let switching_theta = switching_car.pos.arg();
-                match switching_car.action {
-                    Action::Switch(diff_lane) => {
-                        let next_lane = (*lane as i32) + diff_lane; 
-                        match by_lane.get(&(next_lane as usize)) {
-                            Some(ref other_lane) => {
-                                // detect from lower bound on other lane
-                                let idx = match other_lane.binary_search_by(|probe| {
-                                    OrderedFloat(probe.borrow().pos.arg()).cmp(&OrderedFloat(switching_theta))
-                                }) {
-                                    Ok(i) => i,
-                                    Err(i) => i,
-                                };
-                                if idx > 0 {
-                                    let idx = idx - 1;
-                                    let mut car_follow = other_lane[idx].borrow_mut();
-                                    possbile_switch_collision(&mut switching_car, &mut car_follow);
-                                }
-                                // detect from max on other lane
-                                match other_lane.last() {
-                                    Some(ref car_follow) => {
-                                        let mut car_follow = car_follow.borrow_mut();
-                                        possbile_switch_collision(&mut switching_car, &mut car_follow);
-                                    },
-                                    _ => {},
-                                }
-                            },
-                            _ => {},
-                        }                   
-                    },
-                    _ => {},
-                }                
+                if let Action::Switch(diff_lane) = switching_car.action {
+                    let next_lane = (*lane as i32) + diff_lane;
+                    if let Some(other_lane) = by_lane.get(&(next_lane as usize)) {
+                        // detect from lower bound on other lane
+                        let idx = match other_lane.binary_search_by(|probe| {
+                            OrderedFloat(probe.borrow().pos.arg())
+                                .cmp(&OrderedFloat(switching_theta))
+                        }) {
+                            Ok(i) => i,
+                            Err(i) => i,
+                        };
+                        if idx > 0 {
+                            let idx = idx - 1;
+                            let mut car_follow = other_lane[idx].borrow_mut();
+                            possbile_switch_collision(&mut switching_car, &mut car_follow);
+                        }
+                        // detect from max on other lane
+                        if let Some(car_follow) = other_lane.last() {
+                            let mut car_follow = car_follow.borrow_mut();
+                            possbile_switch_collision(&mut switching_car, &mut car_follow);
+                        }
+                    }
+                }
             }
         }
         // detect side collision
@@ -227,36 +219,35 @@ impl RoundaboutSim {
             diff.abs() < delta
         };
         let possible_side_collision = |car_center: &Car, car_other: &Car, tick: f32| -> f32 {
-            if let Action::Switch(car_diff) = car_center.action {
-                if let Action::Switch(ref other_diff) = car_other.action {
-                    let car_r = car_center.pos.norm();
-                    let other_r = car_other.pos.norm();
-                    // both switch in/out, return time to collide if relative position correct
-                    return if car_diff == *other_diff && (car_diff as f32) * (car_r - other_r) > 0.0 {
-                        (car_r - other_r).abs() / car_center.vel
-                    } else {
-                        tick
-                    }
-                }
+            if let Action::Switch(car_diff) = car_center.action
+                && let Action::Switch(ref other_diff) = car_other.action
+            {
+                let car_r = car_center.pos.norm();
+                let other_r = car_other.pos.norm();
+                // both switch in/out, return time to collide if relative position correct
+                return if car_diff == *other_diff && (car_diff as f32) * (car_r - other_r) > 0.0 {
+                    (car_r - other_r).abs() / car_center.vel
+                } else {
+                    tick
+                };
             }
             tick
         };
-        let detect_side_collision_routine = |car_center: &mut Car, car_other: &Car, tick: f32| -> f32 {
-            let this_tick = possible_side_collision(car_center, car_other, tick);
-            return if this_tick < MIN_UPDATE_TICK {
-                car_center.set_action(Action::Stop);
-                // println!("Car {} stops Car {} ", car_other.id, car_center.id);
-                tick
-            }
-            else if this_tick < tick {
-                // println!("Car {} and Car {} restrict update time to {}", car_center.id, car_other.id, this_tick);
-                this_tick
-            }
-            else {
-                tick
-            }
-        };
-        for (_lane, same_lane) in &by_lane {
+        let detect_side_collision_routine =
+            |car_center: &mut Car, car_other: &Car, tick: f32| -> f32 {
+                let this_tick = possible_side_collision(car_center, car_other, tick);
+                if this_tick < MIN_UPDATE_TICK {
+                    car_center.set_action(Action::Stop);
+                    // println!("Car {} stops Car {} ", car_other.id, car_center.id);
+                    tick
+                } else if this_tick < tick {
+                    // println!("Car {} and Car {} restrict update time to {}", car_center.id, car_other.id, this_tick);
+                    this_tick
+                } else {
+                    tick
+                }
+            };
+        for same_lane in by_lane.values() {
             let n = same_lane.len();
             for (i, car) in same_lane.iter().enumerate() {
                 let car_center = &mut car.borrow_mut();
@@ -265,7 +256,7 @@ impl RoundaboutSim {
                     let mut left = (i + (n - 1)) % n;
                     while left != i {
                         let car_other = &same_lane[left].borrow();
-                        if in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) == false {
+                        if !in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) {
                             break;
                         }
                         tick = detect_side_collision_routine(car_center, car_other, tick);
@@ -275,7 +266,7 @@ impl RoundaboutSim {
                     let mut right = (i + 1) % n;
                     while right != i && right != left {
                         let car_other = &same_lane[right].borrow();
-                        if in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) == false {
+                        if !in_side_coliision_range(car_center, car_other, THETA_ALLOW / 2.0) {
                             break;
                         }
                         tick = detect_side_collision_routine(car_center, car_other, tick);
@@ -295,35 +286,37 @@ impl RoundaboutSim {
                 car.borrow_mut().update(tick, setting);
             }
             match car.borrow().action {
-                Action::Stop => {
-                },
+                Action::Stop => {}
                 _ => {
                     has_progress = true;
-                },
+                }
             };
             if car.borrow().finished() {
                 self.finished_cars.push(car.clone());
                 has_progress = true;
-                println!("Car {} finishes at time {}, ({} / {n_cars})",
-                    car.borrow().id, self.t,
+                println!(
+                    "Car {} finishes at time {}, ({} / {n_cars})",
+                    car.borrow().id,
+                    self.t,
                     self.finished_cars.len()
                 );
-            }
-            else {
+            } else {
                 next_cars.push(car.clone());
             }
         }
         self.cars = next_cars;
-        let all_finished = self.cars.len() == 0;
-        assert!(has_progress || all_finished, "everyone stops but not finished");
+        let all_finished = self.cars.is_empty();
+        assert!(
+            has_progress || all_finished,
+            "everyone stops but not finished"
+        );
         if all_finished {
             println!("===== simulation finished in: {} =====", self.t);
-        }
-        else {
+        } else {
             // println!("===== t: {} (+{}) =====", self.t, tick);
             // for car in &self.cars {
             //     println!("id: {}: {:?}", car.borrow().id, car.borrow());
-            // }            
+            // }
         }
         all_finished
     }
@@ -343,16 +336,19 @@ impl RoundaboutSim {
                     let r_lane = setting.r_lanes[lane];
                     let switch_target_pos = Complex::from_polar(r_lane, car_switch.pos.arg());
                     let other_curr_pos = Complex::from_polar(r_lane, car_other.pos.arg());
-                    let other_target_pos = Complex::from_polar(r_lane, car_other.pos.arg() + car_other.vel * tick / (r_lane as f32));
+                    let other_target_pos = Complex::from_polar(
+                        r_lane,
+                        car_other.pos.arg() + car_other.vel * tick / r_lane,
+                    );
                     // @car_switch is in the arc of @car_other
                     let other_curr_2_swtich_target = switch_target_pos / other_curr_pos;
                     let switch_target_2_other_target = other_target_pos / switch_target_pos;
-                    other_curr_2_swtich_target.arg() >= 0.0 && switch_target_2_other_target.arg() <= 0.0
-                },
-                _ => false,                    
+                    other_curr_2_swtich_target.arg() >= 0.0
+                        && switch_target_2_other_target.arg() <= 0.0
+                }
+                _ => false,
             }
-        }
-        else {
+        } else {
             false
         }
     }
@@ -364,17 +360,16 @@ impl RoundaboutSim {
     fn straight_collision(&self, car_follow: &Car, car_precede: &Car) -> f32 {
         match car_follow.action {
             Action::Straight => {
-                assert_eq!(car_follow.lane, car_precede.lane,
+                assert_eq!(
+                    car_follow.lane, car_precede.lane,
                     "on the same lane but straight-straight collision called",
                 );
-                assert_ne!(car_follow.id, car_precede.id,
-                    "have the same id"
-                );
+                assert_ne!(car_follow.id, car_precede.id, "have the same id");
                 let margin_theta = unwrap_theta((car_precede.pos.fdiv(car_follow.pos)).arg());
                 let lane = car_follow.lane;
                 margin_theta * self.setting.r_lanes[lane] / car_follow.vel
-            },
-            _ => {return f32::MAX;},
+            }
+            _ => f32::MAX,
         }
     }
 }
@@ -382,12 +377,9 @@ impl RoundaboutSim {
 pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     let mut sim = RoundaboutSim::from_json(filename)?;
     let mut finished = false;
-    while (sim.t < max_t || max_t < 0.0) && finished == false {
+    while (sim.t < max_t || max_t < 0.0) && !finished {
         finished |= sim.update();
     }
-    return if finished {
-        Some(sim)
-    } else {
-        None
-    }
+    if finished { Some(sim) } else { None }
 }
+
