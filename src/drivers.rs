@@ -1,6 +1,7 @@
 use crate::Car;
 use crate::RoundaboutSimSetting;
 use crate::common::{Action, Shared, THETA_ALLOW, unwrap_theta};
+use crate::common::{SWITCH_IN, SWITCH_OUT};
 
 pub trait Driver {
     fn drive(
@@ -35,7 +36,7 @@ impl Driver for SimpleDriver {
             Action::Stop
         } else if car.lane > 0 && rem_theta <= THETA_ALLOW {
             // switch out
-            Action::Switch(-1)
+            SWITCH_OUT
         } else {
             // greedy
             // cost for straight then switch out
@@ -54,7 +55,7 @@ impl Driver for SimpleDriver {
             };
 
             if switch_in_dist < straight_dist && car.lane < setting.r_lanes.len() - 1 {
-                Action::Switch(1)
+                SWITCH_IN
             } else {
                 Action::Straight
             }
