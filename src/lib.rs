@@ -24,6 +24,7 @@ use setting::SwitchPolicy;
 const DIST_ALLOW: f32 = 1e-2;
 const MIN_UPDATE_TICK: f32 = 1e-2;
 
+#[derive(Debug)]
 pub struct Car {
     pub id: usize,
     pos: Complex<f32>, // to tacke polar
@@ -146,7 +147,7 @@ impl RoundaboutSim {
         // every car determines its action
         for (i, car) in self.cars.iter().enumerate() {
             let car_ref = &mut car.borrow_mut();
-            let action = { self.drivers[i].drive(car_ref, setting) };
+            let action = { self.drivers[i].drive(car_ref, self.t, setting) };
             car_ref.set_action(action);
         }
         // Staight action while a car is switching is not allowed
@@ -305,7 +306,7 @@ impl RoundaboutSim {
             {
                 let car_ref = &mut car.borrow_mut();
                 car_ref.update(tick, setting);
-                self.drivers[i].update(car_ref, tick, setting);
+                self.drivers[i].update(car_ref, self.t, setting);
             }
             match car.borrow().action {
                 Action::Stop => {}
