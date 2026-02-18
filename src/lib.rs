@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 mod render;
+use crate::common::is_on_lane;
 pub use crate::render::render_run;
 
 use json::JsonValue;
@@ -124,9 +125,8 @@ impl RoundaboutSim {
         Some(sim)
     }
     /**
-        return Some(seconds simulated) if simulation finished
-        else None to indicate continue
-    */
+     * return a bool indicating finished
+     */
     pub fn update(&mut self) -> bool {
         let setting = &self.setting;
         let mut by_lane = HashMap::<usize, Vec<Shared<Car>>>::new();
@@ -142,6 +142,20 @@ impl RoundaboutSim {
         for car in &self.cars {
             let action = { car.borrow().driver.drive(car.clone(), setting, &self.cars) };
             car.borrow_mut().set_action(action);
+        }
+        // Staight action while a car is switching is not allowed
+        for car in self.cars.iter_mut() {
+            let car_ref = &mut car.borrow_mut();
+            if let Action::Straight = car_ref.action
+                && !is_on_lane(&car_ref.pos, setting.r_lanes[car_ref.lane])
+            {
+                car_ref.set_action(Action::Stop);
+                println!(
+                    "Car {}'s action force reset to stop due to straight while switching policy, this is a software bug.",
+                    car_ref.id
+                );
+                return true;
+            }
         }
         // detect straight collision, happens to the same lane
         let possible_straight_collision = |car_follow: &mut Car, car_precede: &Car| {
@@ -313,10 +327,12 @@ impl RoundaboutSim {
         if all_finished {
             println!("===== simulation finished in: {} =====", self.t);
         } else {
-            // println!("===== t: {} (+{}) =====", self.t, tick);
-            // for car in &self.cars {
-            //     println!("id: {}: {:?}", car.borrow().id, car.borrow());
-            // }
+            /*
+            println!("===== t: {} (+{}) =====", self.t, tick);
+            for car in &self.cars {
+                println!("{:?}", car.borrow());
+            }
+            */
         }
         all_finished
     }
@@ -382,4 +398,3 @@ pub fn sim_run(filename: &str, max_t: f32) -> Option<RoundaboutSim> {
     }
     if finished { Some(sim) } else { None }
 }
-
