@@ -140,7 +140,7 @@ impl RoundaboutSim {
         let mut tick = setting.tick;
         // every car determines its action
         for car in &self.cars {
-            let action = { car.borrow().driver.drive(car.clone(), setting, &self.cars) };
+            let action = { car.borrow().driver.drive(&car.borrow(), setting) };
             car.borrow_mut().set_action(action);
         }
         // Staight action while a car is switching is not allowed

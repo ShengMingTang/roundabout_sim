@@ -1,35 +1,24 @@
 use crate::Car;
 use crate::RoundaboutSimSetting;
-use crate::common::{Action, Shared, THETA_ALLOW, unwrap_theta};
+use crate::common::{Action, THETA_ALLOW, unwrap_theta};
 use crate::common::{SWITCH_IN, SWITCH_OUT};
 
 pub trait Driver {
-    fn drive(
-        &self,
-        car: Shared<Car>,
-        setting: &RoundaboutSimSetting,
-        others: &[Shared<Car>],
-    ) -> Action;
+    fn drive(&self, car: &Car, setting: &RoundaboutSimSetting) -> Action;
 }
 
 pub struct DriverFactory {}
 
-struct SimpleDriver;
+struct ShortestDistDriver;
 
 impl DriverFactory {
     pub fn make_default_driver_boxed() -> Box<dyn Driver> {
-        Box::new(SimpleDriver {})
+        Box::new(ShortestDistDriver {})
     }
 }
 
-impl Driver for SimpleDriver {
-    fn drive(
-        &self,
-        car: Shared<Car>,
-        setting: &RoundaboutSimSetting,
-        _others: &[Shared<Car>],
-    ) -> Action {
-        let car = &car.borrow();
+impl Driver for ShortestDistDriver {
+    fn drive(&self, car: &Car, setting: &RoundaboutSimSetting) -> Action {
         let rem_theta = (car.dst / car.pos).to_polar().1.abs(); // remaining
         if car.finished() {
             // finished
