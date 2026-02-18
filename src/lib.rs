@@ -91,6 +91,7 @@ impl RoundaboutSim {
             return None;
         }
         let jinit = &jobj["init"];
+        let jdriver = &jobj["driver"];
         let mut cars = vec![];
         let mut drivers = vec![];
         for (key, value) in jinit.entries() {
@@ -109,8 +110,11 @@ impl RoundaboutSim {
                 ),
                 action: Action::Straight,
             })));
-            // TODO: may be provided from setting
-            drivers.push(DriverFactory::make_default_driver_boxed());
+            if value.has_key("driver") {
+                drivers.push(DriverFactory::make_boxed_from_json(&value["driver"]));
+            } else {
+                drivers.push(DriverFactory::make_boxed_from_json(jdriver));
+            }
         }
         for (i, driver) in drivers.iter_mut().enumerate() {
             driver.init(&cars[i].borrow(), &setting);

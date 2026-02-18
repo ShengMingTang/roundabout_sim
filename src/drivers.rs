@@ -4,6 +4,7 @@ use crate::common::is_on_lane;
 use crate::common::{Action, THETA_ALLOW, unwrap_theta};
 use crate::common::{SWITCH_IN, SWITCH_OUT};
 use core::f32;
+use json::JsonValue;
 use num_complex::Complex;
 
 pub trait Driver {
@@ -27,16 +28,33 @@ struct ShortestTimeDriver {
 }
 
 impl DriverFactory {
-    pub fn make_default_driver_boxed() -> Box<dyn Driver> {
+    fn make_shortest_dist_driver_boxed() -> Box<dyn Driver> {
         Box::new(ShortestDistDriver {})
     }
-    pub fn make_shortest_time_driver_boxed() -> Box<dyn Driver> {
+    fn make_shortest_time_driver_boxed() -> Box<dyn Driver> {
         Box::new(ShortestTimeDriver {
             lane_last_ts: Vec::new(),
             lane_last_pos: Vec::new(),
             lane_vel: Vec::new(),
             prev_lane: 0,
         })
+    }
+    fn make_default_driver_boxed() -> Box<dyn Driver> {
+        DriverFactory::make_shortest_dist_driver_boxed()
+    }
+    pub fn make_boxed_from_json(jobj: &JsonValue) -> Box<dyn Driver> {
+        if let JsonValue::Short(short) = jobj {
+            let name = short.as_str();
+            if name == "ShortestDist" {
+                DriverFactory::make_shortest_dist_driver_boxed()
+            } else if name == "ShortestTime" {
+                DriverFactory::make_shortest_time_driver_boxed()
+            } else {
+                DriverFactory::make_default_driver_boxed()
+            }
+        } else {
+            DriverFactory::make_default_driver_boxed()
+        }
     }
 }
 
