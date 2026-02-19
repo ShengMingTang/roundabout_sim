@@ -31,7 +31,6 @@ pub struct Car {
     lane: usize,       // 0 is the outermost
     dst: Complex<f32>, // destination polar
     action: Action,
-    driver: Box<dyn Driver>, // driver to drive this car
 }
 
 impl Car {
@@ -82,6 +81,7 @@ pub struct RoundaboutSim {
     pub setting: RoundaboutSimSetting,
     pub finished_cars: Vec<Shared<Car>>,
     cars: Vec<Shared<Car>>,
+    drivers: Vec<Box<dyn Driver>>,
 }
 
 impl RoundaboutSim {
@@ -91,6 +91,7 @@ impl RoundaboutSim {
         }
         let jinit = &jobj["init"];
         let mut cars = vec![];
+        let mut drivers = vec![];
         for (key, value) in jinit.entries() {
             let lane = value["lane"].as_usize()?;
             let r = *setting.r_lanes.get(lane)?;
@@ -106,14 +107,18 @@ impl RoundaboutSim {
                     2.0 * PI / (setting.n_inter as f32) * value["dst"].as_f32()?,
                 ),
                 action: Action::Straight,
-                // TODO: may be provided from setting
-                driver: DriverFactory::make_default_driver_boxed(),
-            })))
+            })));
+            // TODO: may be provided from setting
+            drivers.push(DriverFactory::make_default_driver_boxed());
+        }
+        for (i, driver) in drivers.iter_mut().enumerate() {
+            driver.init(&cars[i].borrow(), &setting);
         }
         Some(RoundaboutSim {
             t: 0.0,
             setting,
             cars,
+            drivers,
             finished_cars: vec![],
         })
     }
@@ -139,9 +144,10 @@ impl RoundaboutSim {
         }
         let mut tick = setting.tick;
         // every car determines its action
-        for car in &self.cars {
-            let action = { car.borrow().driver.drive(&car.borrow(), setting) };
-            car.borrow_mut().set_action(action);
+        for (i, car) in self.cars.iter().enumerate() {
+            let car_ref = &mut car.borrow_mut();
+            let action = { self.drivers[i].drive(car_ref, setting) };
+            car_ref.set_action(action);
         }
         // Staight action while a car is switching is not allowed
         for car in self.cars.iter_mut() {
@@ -295,9 +301,11 @@ impl RoundaboutSim {
         // update phase
         let mut next_cars = vec![];
         let n_cars = self.finished_cars.len() + self.cars.len();
-        for car in self.cars.iter() {
+        for (i, car) in self.cars.iter().enumerate() {
             {
-                car.borrow_mut().update(tick, setting);
+                let car_ref = &mut car.borrow_mut();
+                car_ref.update(tick, setting);
+                self.drivers[i].update(car_ref, tick, setting);
             }
             match car.borrow().action {
                 Action::Stop => {}

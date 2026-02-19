@@ -2,9 +2,12 @@ use crate::Car;
 use crate::RoundaboutSimSetting;
 use crate::common::{Action, THETA_ALLOW, unwrap_theta};
 use crate::common::{SWITCH_IN, SWITCH_OUT};
+use core::f32;
 
 pub trait Driver {
+    fn init(&mut self, _car: &Car, _setting: &RoundaboutSimSetting) {}
     fn drive(&self, car: &Car, setting: &RoundaboutSimSetting) -> Action;
+    fn update(&mut self, _car: &Car, _tick: f32, _setting: &RoundaboutSimSetting) {}
 }
 
 pub struct DriverFactory {}
